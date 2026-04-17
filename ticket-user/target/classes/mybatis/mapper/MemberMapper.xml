@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.MemberMapper">
+    <select id="findByEmail" resultType="Member">SELECT * FROM member WHERE email = #{email}</select>
+    <select id="findById" resultType="Member">SELECT * FROM member WHERE member_id = #{memberId}</select>
+    <select id="existsByEmail" resultType="int">SELECT COUNT(*) FROM member WHERE email = #{email}</select>
+    <insert id="insert" parameterType="Member" useGeneratedKeys="true" keyProperty="memberId">
+        INSERT INTO member (email, password, name, phone, role, status)
+        VALUES (#{email}, #{password}, #{name}, #{phone},
+                COALESCE(#{role}, 'USER'),
+                COALESCE(#{status}, 'ACTIVE'))
+    </insert>
+    <update id="updateLastLogin">UPDATE member SET last_login_at = NOW() WHERE member_id = #{memberId}</update>
+    <update id="updateStatus">
+        UPDATE member SET status = #{status}, updated_at = NOW()
+        WHERE member_id = #{memberId}
+    </update>
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*)
+        FROM member
+    </select>
+    <select id="findAll" resultType="Member">
+        SELECT *
+        FROM member
+        <where>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    email LIKE CONCAT('%', #{keyword}, '%')
+                    OR name LIKE CONCAT('%', #{keyword}, '%')
+                    OR phone LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countFiltered" resultType="int">
+        SELECT COUNT(*)
+        FROM member
+        <where>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    email LIKE CONCAT('%', #{keyword}, '%')
+                    OR name LIKE CONCAT('%', #{keyword}, '%')
+                    OR phone LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+</mapper>

@@ -1,0 +1,13 @@
+com\ticketlegacy\web\controller\PartnerCouponController.class
+com\ticketlegacy\web\controller\PartnerLoginController.class
+com\ticketlegacy\web\controller\PartnerVenueController.class
+com\ticketlegacy\web\interceptor\AuthInterceptor.class
+com\ticketlegacy\web\support\AuthMember.class
+com\ticketlegacy\web\controller\PartnerPromoterController.class
+com\ticketlegacy\web\support\LoginUser.class
+com\ticketlegacy\web\filter\JwtAuthenticationFilter.class
+com\ticketlegacy\web\filter\AjaxAwareAuthEntryPoint.class
+com\ticketlegacy\web\controller\PromoterController.class
+com\ticketlegacy\web\controller\VenueManagerController.class
+com\ticketlegacy\web\advice\GlobalExceptionHandler.class
+com\ticketlegacy\web\support\AuthMemberArgumentResolver.class

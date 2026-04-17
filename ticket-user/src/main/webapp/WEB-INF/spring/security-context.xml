@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xsi:schemaLocation="
+           http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/security
+           http://www.springframework.org/schema/security/spring-security.xsd">
+
+    <security:http create-session="stateless" use-expressions="true"
+                   entry-point-ref="jwtAuthEntryPoint">
+
+        <!-- STS/헬스체크 핑 -->
+        <security:intercept-url pattern="/"             access="permitAll" />
+
+        <!-- 정적 리소스 -->
+        <security:intercept-url pattern="/css/**"       access="permitAll" />
+        <security:intercept-url pattern="/js/**"        access="permitAll" />
+        <security:intercept-url pattern="/images/**"    access="permitAll" />
+        <security:intercept-url pattern="/resources/**" access="permitAll" />
+
+        <!-- 공개 페이지 (사용자 포털) -->
+        <security:intercept-url pattern="/"                      access="permitAll" />
+        <security:intercept-url pattern="/member/login"          access="permitAll" />
+        <security:intercept-url pattern="/member/join"           access="permitAll" />
+        <security:intercept-url pattern="/member/join/**"        access="permitAll" />
+        <security:intercept-url pattern="/member/api/login"      access="permitAll" />
+        <security:intercept-url pattern="/member/api/join"       access="permitAll" />
+        <security:intercept-url pattern="/member/api/logout"     access="permitAll" />
+        <security:intercept-url pattern="/performance/list"      access="permitAll" />
+        <security:intercept-url pattern="/performance/detail/**" access="permitAll" />
+        <security:intercept-url pattern="/api/performances/**"   access="permitAll" />
+
+        <!-- 대기열 페이지 (비로그인도 접근 가능 — scheduleId만 필요) -->
+        <security:intercept-url pattern="/queue/**"              access="permitAll" />
+        <security:intercept-url pattern="/api/queue/**"          access="permitAll" />
+
+        <!-- 나머지는 인증 필요 -->
+        <security:intercept-url pattern="/**" access="isAuthenticated()" />
+
+        <security:custom-filter ref="jwtAuthenticationFilter" before="FORM_LOGIN_FILTER" />
+        <security:csrf disabled="true" />
+        <security:headers>
+            <security:frame-options policy="SAMEORIGIN" />
+        </security:headers>
+    </security:http>
+
+    <!-- 미인증 접근 → /member/login 으로 리다이렉트 -->
+    <bean id="jwtAuthEntryPoint"
+          class="com.ticketlegacy.web.filter.AjaxAwareAuthEntryPoint" />
+
+    <bean id="jwtAuthenticationFilter"
+          class="com.ticketlegacy.web.filter.JwtAuthenticationFilter" />
+
+    <bean id="passwordEncoder"
+          class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder" />
+
+    <security:authentication-manager alias="authenticationManager">
+        <security:authentication-provider>
+            <security:password-encoder ref="passwordEncoder" />
+            <security:user-service>
+                <security:user name="system" password="unused" authorities="ROLE_SYSTEM" />
+            </security:user-service>
+        </security:authentication-provider>
+    </security:authentication-manager>
+
+</beans>

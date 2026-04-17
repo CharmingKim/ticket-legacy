@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.ReservationMapper">
+    <insert id="insert" parameterType="Reservation" useGeneratedKeys="true" keyProperty="reservationId">
+        INSERT INTO reservation (reservation_no, schedule_id, member_id, total_amount, seat_count, status)
+        VALUES (#{reservationNo}, #{scheduleId}, #{memberId}, #{totalAmount}, #{seatCount}, 'PENDING')
+    </insert>
+    <insert id="insertSeats" parameterType="java.util.List">
+        INSERT INTO reservation_seat (reservation_id, seat_id, price) VALUES
+        <foreach collection="seats" item="s" separator=",">(#{s.reservationId}, #{s.seatId}, #{s.price})</foreach>
+    </insert>
+    <resultMap id="reservationDetail" type="Reservation">
+        <id property="reservationId" column="reservation_id"/>
+        <result property="reservationNo" column="reservation_no"/><result property="scheduleId" column="schedule_id"/>
+        <result property="memberId" column="member_id"/><result property="totalAmount" column="total_amount"/>
+        <result property="seatCount" column="seat_count"/><result property="status" column="rsv_status"/>
+        <result property="createdAt" column="created_at"/><result property="confirmedAt" column="confirmed_at"/>
+        <result property="performanceTitle" column="performance_title"/><result property="venue" column="venue"/>
+        <result property="memberName" column="member_name"/><result property="memberEmail" column="member_email"/>
+        <result property="memberPhone" column="member_phone"/><result property="showDate" column="show_date"/>
+        <result property="showTime" column="show_time"/><result property="paymentStatus" column="payment_status"/>
+        <result property="paymentMethod" column="payment_method"/><result property="checkedInAt" column="checked_in_at"/>
+        <collection property="seats" ofType="ReservationSeat">
+            <result property="seatId" column="rs_seat_id"/><result property="price" column="rs_price"/>
+            <result property="section" column="rs_section"/><result property="seatRow" column="rs_seat_row"/>
+            <result property="seatNumber" column="rs_seat_number"/><result property="grade" column="rs_grade"/>
+        </collection>
+    </resultMap>
+    <select id="findById" resultMap="reservationDetail">
+        SELECT r.*, r.status AS rsv_status, p.title AS performance_title, p.venue_name AS venue,
+               m.name AS member_name, m.email AS member_email, m.phone AS member_phone,
+               sc.show_date, sc.show_time, pay.status AS payment_status, pay.method AS payment_method,
+               el.checked_in_at,
+               rs.seat_id AS rs_seat_id, rs.price AS rs_price, s.section AS rs_section,
+               s.seat_row AS rs_seat_row, s.seat_number AS rs_seat_number, s.grade AS rs_grade
+        FROM reservation r JOIN schedule sc ON r.schedule_id=sc.schedule_id
+        JOIN performance p ON sc.performance_id=p.performance_id
+        JOIN member m ON r.member_id=m.member_id
+        LEFT JOIN payment pay ON pay.reservation_id=r.reservation_id
+        LEFT JOIN entrance_log el ON el.reservation_id=r.reservation_id
+        LEFT JOIN reservation_seat rs ON r.reservation_id=rs.reservation_id
+        LEFT JOIN seat s ON rs.seat_id=s.seat_id WHERE r.reservation_id=#{reservationId}
+    </select>
+    <select id="findByReservationNo" resultMap="reservationDetail">
+        SELECT r.*, r.status AS rsv_status, p.title AS performance_title, p.venue_name AS venue,
+               m.name AS member_name, m.email AS member_email, m.phone AS member_phone,
+               sc.show_date, sc.show_time, pay.status AS payment_status, pay.method AS payment_method,
+               el.checked_in_at,
+               rs.seat_id AS rs_seat_id, rs.price AS rs_price, s.section AS rs_section,
+               s.seat_row AS rs_seat_row, s.seat_number AS rs_seat_number, s.grade AS rs_grade
+        FROM reservation r JOIN schedule sc ON r.schedule_id=sc.schedule_id
+        JOIN performance p ON sc.performance_id=p.performance_id
+        JOIN member m ON r.member_id=m.member_id
+        LEFT JOIN payment pay ON pay.reservation_id=r.reservation_id
+        LEFT JOIN entrance_log el ON el.reservation_id=r.reservation_id
+        LEFT JOIN reservation_seat rs ON r.reservation_id=rs.reservation_id
+        LEFT JOIN seat s ON rs.seat_id=s.seat_id WHERE r.reservation_no=#{reservationNo}
+    </select>
+    <select id="findByMemberId" resultType="Reservation">
+        SELECT r.*, p.title AS performance_title, p.venue_name AS venue,
+               sc.show_date, sc.show_time
+        FROM reservation r
+        JOIN schedule sc ON r.schedule_id=sc.schedule_id
+        JOIN performance p ON sc.performance_id=p.performance_id
+        WHERE r.member_id=#{memberId} ORDER BY r.created_at DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <update id="updateStatus">
+        UPDATE reservation SET status=#{status},
+        cancelled_at = CASE WHEN #{status}='CANCELLED' THEN NOW() ELSE cancelled_at END
+        WHERE reservation_id=#{reservationId}
+    </update>
+    <update id="updateConfirmed">
+        UPDATE reservation SET status='CONFIRMED', confirmed_at=NOW() WHERE reservation_id=#{reservationId}
+    </update>
+    <select id="countToday" resultType="int">
+        SELECT COUNT(*)
+        FROM reservation
+        WHERE DATE(created_at) = CURDATE()
+    </select>
+    <select id="countConfirmedToday" resultType="int">
+        SELECT COUNT(*)
+        FROM reservation
+        WHERE status = 'CONFIRMED'
+          AND DATE(COALESCE(confirmed_at, created_at)) = CURDATE()
+    </select>
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*)
+        FROM reservation
+        WHERE status = #{status}
+    </select>
+    <select id="searchByKeyword" resultType="Reservation">
+        SELECT r.*, p.title AS performance_title, p.venue_name AS venue,
+               m.name AS member_name, m.email AS member_email, m.phone AS member_phone,
+               sc.show_date, sc.show_time, pay.status AS payment_status, pay.method AS payment_method,
+               el.checked_in_at
+        FROM reservation r
+        JOIN member m ON r.member_id = m.member_id
+        JOIN schedule sc ON r.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        LEFT JOIN payment pay ON pay.reservation_id = r.reservation_id
+        LEFT JOIN entrance_log el ON el.reservation_id = r.reservation_id
+        <where>
+            <if test="status != null and status != ''">
+                AND r.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    r.reservation_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR m.name LIKE CONCAT('%', #{keyword}, '%')
+                    OR m.email LIKE CONCAT('%', #{keyword}, '%')
+                    OR p.title LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY r.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countByKeyword" resultType="int">
+        SELECT COUNT(*)
+        FROM reservation r
+        JOIN member m ON r.member_id = m.member_id
+        JOIN schedule sc ON r.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        <where>
+            <if test="status != null and status != ''">
+                AND r.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    r.reservation_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR m.name LIKE CONCAT('%', #{keyword}, '%')
+                    OR m.email LIKE CONCAT('%', #{keyword}, '%')
+                    OR p.title LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+    <select id="findAllByMemberId" resultType="Reservation">
+        SELECT r.*, p.title AS performance_title, p.venue_name AS venue,
+               sc.show_date, sc.show_time
+        FROM reservation r
+        JOIN schedule sc ON r.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        WHERE r.member_id = #{memberId}
+        ORDER BY r.created_at DESC
+    </select>
+
+    <!-- 마이페이지 AJAX: 상태 필터 + 페이징 -->
+    <select id="findByMemberIdAndStatus" resultType="Reservation">
+        SELECT r.*, p.title AS performance_title, p.venue_name AS venue,
+               sc.show_date, sc.show_time, pay.method AS payment_method
+        FROM reservation r
+        JOIN schedule sc ON r.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        LEFT JOIN payment pay ON pay.reservation_id = r.reservation_id
+        WHERE r.member_id = #{memberId}
+        <if test="status != null and status != ''">AND r.status = #{status}</if>
+        ORDER BY r.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByMemberIdAndStatus" resultType="int">
+        SELECT COUNT(*)
+        FROM reservation r
+        WHERE r.member_id = #{memberId}
+        <if test="status != null and status != ''">AND r.status = #{status}</if>
+    </select>
+</mapper>

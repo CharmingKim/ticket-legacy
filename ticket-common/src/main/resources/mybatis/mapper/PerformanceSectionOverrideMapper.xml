@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.PerformanceSectionOverrideMapper">
+
+    <resultMap id="overrideMap" type="PerformanceSectionOverride">
+        <id property="overrideId" column="override_id"/>
+        <result property="performanceId" column="performance_id"/>
+        <result property="sectionId" column="section_id"/>
+        <result property="active" column="is_active"/>
+        <result property="customRows" column="custom_rows"/>
+        <result property="customSeatsPerRow" column="custom_seats_per_row"/>
+        <result property="note" column="note"/>
+        <result property="sectionName" column="section_name"/>
+        <result property="sectionType" column="section_type"/>
+    </resultMap>
+
+    <insert id="upsert" parameterType="PerformanceSectionOverride">
+        INSERT INTO performance_section_override
+            (performance_id, section_id, is_active, custom_rows, custom_seats_per_row, note)
+        VALUES
+            (#{performanceId}, #{sectionId}, #{active}, #{customRows}, #{customSeatsPerRow}, #{note})
+        ON DUPLICATE KEY UPDATE
+            is_active = VALUES(is_active),
+            custom_rows = VALUES(custom_rows),
+            custom_seats_per_row = VALUES(custom_seats_per_row),
+            note = VALUES(note)
+    </insert>
+
+    <select id="findByPerformanceId" resultMap="overrideMap">
+        SELECT pso.*, vs.section_name, vs.section_type
+        FROM performance_section_override pso
+        JOIN venue_section vs ON pso.section_id = vs.section_id
+        WHERE pso.performance_id = #{performanceId}
+        ORDER BY vs.display_order
+    </select>
+
+    <delete id="deleteByPerformanceId">
+        DELETE FROM performance_section_override WHERE performance_id = #{performanceId}
+    </delete>
+
+    <delete id="deleteBySectionAndPerformance">
+        DELETE FROM performance_section_override
+        WHERE performance_id = #{performanceId} AND section_id = #{sectionId}
+    </delete>
+
+</mapper>

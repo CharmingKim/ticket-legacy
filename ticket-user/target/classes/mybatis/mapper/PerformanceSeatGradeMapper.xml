@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.PerformanceSeatGradeMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO performance_seat_grade (performance_id, section_id, grade, price)
+        VALUES
+        <foreach collection="grades" item="g" separator=",">
+            (#{g.performanceId}, #{g.sectionId}, #{g.grade}, #{g.price})
+        </foreach>
+    </insert>
+
+    <select id="findByPerformanceId" resultType="PerformanceSeatGrade">
+        SELECT psg.*, vs.section_name, vs.section_type, vs.total_rows, vs.seats_per_row
+        FROM performance_seat_grade psg
+        JOIN venue_section vs ON psg.section_id = vs.section_id
+        WHERE psg.performance_id = #{performanceId}
+        ORDER BY vs.display_order
+    </select>
+
+    <delete id="deleteByPerformanceId">
+        DELETE FROM performance_seat_grade WHERE performance_id = #{performanceId}
+    </delete>
+
+</mapper>

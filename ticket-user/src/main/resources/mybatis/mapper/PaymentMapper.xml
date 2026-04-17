@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.PaymentMapper">
+
+    <resultMap id="paymentResultMap" type="com.ticketlegacy.domain.Payment">
+        <id     property="id"             column="id" />
+        <result property="reservationId"  column="reservation_id" />
+        <result property="memberId"       column="member_id" />
+        <result property="amount"         column="amount" />
+        <result property="couponId"       column="coupon_id" />
+        <result property="discountAmount" column="discount_amount" />
+        <result property="finalAmount"    column="final_amount" />
+        <result property="status"         column="status" />
+        <result property="idempotencyKey" column="idempotency_key" />
+        <result property="pgTransactionId" column="pg_transaction_id" />
+        <result property="failReason"     column="fail_reason" />
+        <result property="createdAt"      column="created_at" />
+        <result property="completedAt"    column="completed_at" />
+    </resultMap>
+
+    <!-- 결제 레코드 삽입 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO payment (
+            reservation_id, member_id, amount, coupon_id,
+            discount_amount, final_amount, status, idempotency_key,
+            created_at
+        ) VALUES (
+            #{reservationId}, #{memberId}, #{amount}, #{couponId},
+            #{discountAmount}, #{finalAmount}, #{status}, #{idempotencyKey},
+            NOW()
+        )
+    </insert>
+
+    <!-- 멱등성 키로 조회 -->
+    <select id="findByIdempotencyKey" resultMap="paymentResultMap">
+        SELECT * FROM payment
+        WHERE idempotency_key = #{idempotencyKey}
+        LIMIT 1
+    </select>
+
+    <!-- 결제 완료 처리 -->
+    <update id="updateCompleted">
+        UPDATE payment
+        SET status = 'COMPLETED',
+            pg_transaction_id = #{pgTransactionId},
+            completed_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 결제 실패 처리 -->
+    <update id="updateFailed">
+        UPDATE payment
+        SET status = 'FAILED',
+            fail_reason = #{failReason}
+        WHERE id = #{id}
+    </update>
+
+    <!-- PENDING 상태인 오래된 결제 조회 (스케줄러용) -->
+    <select id="findStalePending" resultMap="paymentResultMap">
+        SELECT * FROM payment
+        WHERE status = 'PENDING'
+          AND created_at &lt; DATE_SUB(NOW(), INTERVAL #{minutes} MINUTE)
+    </select>
+
+</mapper>

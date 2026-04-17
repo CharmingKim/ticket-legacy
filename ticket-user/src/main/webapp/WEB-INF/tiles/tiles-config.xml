@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC
+        "-//Apache Software Foundation//DTD Tiles Configuration 3.0//EN"
+        "http://tiles.apache.org/dtds/tiles-config_3_0.dtd">
+<tiles-definitions>
+
+    <!-- 기본 퍼블릭 레이아웃 -->
+    <definition name="layout-default" template="/WEB-INF/views/layout/default-layout.jsp">
+        <put-attribute name="header"  value="/WEB-INF/views/layout/header.jsp" />
+        <put-attribute name="content" value="" />
+        <put-attribute name="footer"  value="/WEB-INF/views/layout/footer.jsp" />
+    </definition>
+
+    <!-- 홈 -->
+    <definition name="index" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/performance/list.jsp" />
+    </definition>
+
+    <!-- 공연 -->
+    <definition name="performance/list" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/performance/list.jsp" />
+    </definition>
+    <definition name="performance/detail" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/performance/detail.jsp" />
+    </definition>
+
+    <!-- 좌석 선택 -->
+    <definition name="seat/select" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/seat/select.jsp" />
+    </definition>
+
+    <!-- 예매 -->
+    <definition name="reservation/confirm" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/reservation/confirm.jsp" />
+    </definition>
+    <definition name="reservation/history" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/reservation/history.jsp" />
+    </definition>
+
+    <!-- 회원 -->
+    <definition name="member/login" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/login.jsp" />
+    </definition>
+    <definition name="member/join" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/join.jsp" />
+    </definition>
+    <definition name="member/mypage" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/mypage.jsp" />
+    </definition>
+
+    <!-- 대기열 -->
+    <definition name="queue/waiting" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/queue/waiting.jsp" />
+    </definition>
+
+    <!-- 에러 페이지 -->
+    <definition name="error/404" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/404.jsp" />
+    </definition>
+    <definition name="error/500" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/500.jsp" />
+    </definition>
+    <definition name="error/503" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/503.jsp" />
+    </definition>
+
+</tiles-definitions>

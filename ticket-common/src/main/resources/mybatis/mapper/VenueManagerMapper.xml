@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.VenueManagerMapper">
+
+    <resultMap id="vmMap" type="com.ticketlegacy.domain.VenueManager">
+        <id     property="managerId"      column="manager_id" />
+        <result property="memberId"       column="member_id" />
+        <result property="venueId"        column="venue_id" />
+        <result property="department"     column="department" />
+        <result property="position"       column="position" />
+        <result property="approvalStatus" column="approval_status" />
+        <result property="approvedBy"     column="approved_by" />
+        <result property="approvedAt"     column="approved_at" />
+        <result property="createdAt"      column="created_at" />
+        <result property="updatedAt"      column="updated_at" />
+        <result property="memberEmail"    column="member_email" />
+        <result property="memberName"     column="member_name" />
+        <result property="memberPhone"    column="member_phone" />
+        <result property="venueName"      column="venue_name" />
+    </resultMap>
+
+    <select id="findById" resultMap="vmMap">
+        SELECT vm.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone,
+               v.name  AS venue_name
+        FROM venue_manager vm
+        JOIN member m ON vm.member_id = m.member_id
+        JOIN venue  v ON vm.venue_id  = v.venue_id
+        WHERE vm.manager_id = #{managerId}
+    </select>
+
+    <select id="findByMemberId" resultMap="vmMap">
+        SELECT vm.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone,
+               v.name  AS venue_name
+        FROM venue_manager vm
+        JOIN member m ON vm.member_id = m.member_id
+        JOIN venue  v ON vm.venue_id  = v.venue_id
+        WHERE vm.member_id = #{memberId}
+    </select>
+
+    <select id="findByStatus" resultMap="vmMap">
+        SELECT vm.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone,
+               v.name  AS venue_name
+        FROM venue_manager vm
+        JOIN member m ON vm.member_id = m.member_id
+        JOIN venue  v ON vm.venue_id  = v.venue_id
+        WHERE vm.approval_status = #{status}
+        ORDER BY vm.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM venue_manager
+        WHERE approval_status = #{status}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="managerId">
+        INSERT INTO venue_manager (
+            member_id, venue_id, department, position, approval_status
+        ) VALUES (
+            #{memberId}, #{venueId}, #{department}, #{position}, #{approvalStatus}
+        )
+    </insert>
+
+    <update id="updateApproval">
+        UPDATE venue_manager
+        SET approval_status = #{approvalStatus},
+            approved_by     = #{approvedBy},
+            approved_at     = NOW(),
+            updated_at      = NOW()
+        WHERE manager_id = #{managerId}
+    </update>
+
+</mapper>

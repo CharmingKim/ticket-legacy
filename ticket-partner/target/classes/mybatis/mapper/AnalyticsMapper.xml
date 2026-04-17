@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.AnalyticsMapper">
+
+    <!-- 최근 N일 일별 예약/매출 트렌드 -->
+    <select id="findDailyReservationTrend" resultType="map">
+        SELECT
+            DATE_FORMAT(created_at, '%Y-%m-%d') AS dt,
+            COUNT(*) AS total_count,
+            SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END) AS confirmed_count,
+            SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled_count,
+            COALESCE(SUM(CASE WHEN status = 'CONFIRMED' THEN total_amount ELSE 0 END), 0) AS daily_revenue
+        FROM reservation
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL #{days} DAY)
+        GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+        ORDER BY dt ASC
+    </select>
+
+    <!-- 카테고리별 공연 분포 -->
+    <select id="findPerformanceCategoryStats" resultType="map">
+        SELECT
+            category,
+            COUNT(*) AS total_count,
+            SUM(CASE WHEN approval_status = 'PUBLISHED' THEN 1 ELSE 0 END) AS published_count,
+            SUM(CASE WHEN status = 'ON_SALE' THEN 1 ELSE 0 END) AS on_sale_count
+        FROM performance
+        WHERE approval_status NOT IN ('DRAFT', 'REJECTED')
+        GROUP BY category
+        ORDER BY total_count DESC
+    </select>
+
+    <!-- 월별 매출 집계 -->
+    <select id="findMonthlyRevenueTrend" resultType="map">
+        SELECT
+            DATE_FORMAT(confirmed_at, '%Y-%m') AS year_month,
+            COUNT(*) AS confirmed_count,
+            SUM(total_amount) AS total_revenue,
+            AVG(total_amount) AS avg_amount
+        FROM reservation
+        WHERE status = 'CONFIRMED'
+          AND confirmed_at >= DATE_SUB(NOW(), INTERVAL #{months} MONTH)
+        GROUP BY DATE_FORMAT(confirmed_at, '%Y-%m')
+        ORDER BY year_month ASC
+    </select>
+
+    <!-- 시간대별 예약 분포 (트래픽 패턴 분석) -->
+    <select id="findReservationByHour" resultType="map">
+        SELECT
+            HOUR(created_at) AS hour_of_day,
+            COUNT(*) AS reservation_count,
+            SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END) AS confirmed_count
+        FROM reservation
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY HOUR(created_at)
+        ORDER BY hour_of_day ASC
+    </select>
+
+    <!-- TOP 기획사 매출 -->
+    <select id="findTopPromotersByRevenue" resultType="map">
+        SELECT
+            pr.promoter_id,
+            pr.company_name,
+            COUNT(DISTINCT p.performance_id) AS performance_count,
+            COUNT(r.reservation_id) AS reservation_count,
+            COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END), 0) AS total_revenue,
+            COALESCE(ROUND(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END) * 0.1), 0) AS platform_fee
+        FROM promoter pr
+        LEFT JOIN performance p ON p.promoter_id = pr.promoter_id
+        LEFT JOIN schedule sc ON sc.performance_id = p.performance_id
+        LEFT JOIN reservation r ON r.schedule_id = sc.schedule_id
+        WHERE pr.approval_status = 'APPROVED'
+        GROUP BY pr.promoter_id, pr.company_name
+        ORDER BY total_revenue DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- TOP 공연 매출 -->
+    <select id="findTopPerformancesByRevenue" resultType="map">
+        SELECT
+            p.performance_id,
+            p.title,
+            p.category,
+            pr.company_name AS promoter_name,
+            p.venue_name,
+            COUNT(DISTINCT sc.schedule_id) AS schedule_count,
+            COUNT(r.reservation_id) AS reservation_count,
+            COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END), 0) AS total_revenue
+        FROM performance p
+        LEFT JOIN promoter pr ON p.promoter_id = pr.promoter_id
+        LEFT JOIN schedule sc ON sc.performance_id = p.performance_id
+        LEFT JOIN reservation r ON r.schedule_id = sc.schedule_id
+        WHERE p.approval_status IN ('APPROVED', 'PUBLISHED')
+        GROUP BY p.performance_id, p.title, p.category, pr.company_name, p.venue_name
+        ORDER BY total_revenue DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 좌석 등급별 판매 분포 -->
+    <select id="findSeatGradeSalesDistribution" resultType="map">
+        SELECT
+            s.grade,
+            COUNT(si.inventory_id) AS total_seats,
+            SUM(CASE WHEN si.status = 'RESERVED' THEN 1 ELSE 0 END) AS reserved_count,
+            SUM(CASE WHEN si.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_count,
+            ROUND(100.0 * SUM(CASE WHEN si.status = 'RESERVED' THEN 1 ELSE 0 END) / COUNT(*), 1) AS sell_rate
+        FROM seat_inventory si
+        JOIN seat s ON si.seat_id = s.seat_id
+        WHERE si.hold_type = 'PUBLIC'
+        GROUP BY s.grade
+        ORDER BY FIELD(s.grade, 'VIP', 'R', 'S', 'A', 'STANDING')
+    </select>
+
+    <!-- 전체 KPI 요약 -->
+    <select id="findPlatformKpiSummary" resultType="map">
+        SELECT
+            (SELECT COUNT(*) FROM member WHERE role = 'USER' AND status = 'ACTIVE') AS active_users,
+            (SELECT COUNT(*) FROM member WHERE role = 'USER' AND DATE(created_at) = CURDATE()) AS new_users_today,
+            (SELECT COUNT(*) FROM performance WHERE status = 'ON_SALE') AS on_sale_performances,
+            (SELECT COUNT(*) FROM reservation WHERE DATE(created_at) = CURDATE()) AS today_reservations,
+            (SELECT COALESCE(SUM(total_amount), 0) FROM reservation
+             WHERE status = 'CONFIRMED' AND DATE(confirmed_at) = CURDATE()) AS today_revenue,
+            (SELECT COALESCE(SUM(total_amount), 0) FROM reservation
+             WHERE status = 'CONFIRMED'
+               AND YEAR(confirmed_at) = YEAR(NOW())
+               AND MONTH(confirmed_at) = MONTH(NOW())) AS month_revenue,
+            (SELECT COUNT(*) FROM seat_inventory WHERE status = 'HELD'
+             AND held_until > NOW()) AS active_holds,
+            (SELECT COUNT(*) FROM reservation WHERE status = 'PENDING') AS pending_reservations
+        FROM DUAL
+    </select>
+
+</mapper>

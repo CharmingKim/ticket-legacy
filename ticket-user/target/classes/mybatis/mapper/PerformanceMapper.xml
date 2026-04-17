@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.PerformanceMapper">
+    <select id="findAll" resultType="Performance">
+        SELECT * FROM performance
+        WHERE approval_status = 'PUBLISHED'
+        <if test="category != null and category != ''">AND category = #{category}</if>
+        <if test="status != null and status != ''">AND status = #{status}</if>
+        <if test="keyword != null and keyword != ''">
+            AND (title LIKE CONCAT('%', #{keyword}, '%')
+              OR venue_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY ticket_open_at DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM performance
+        WHERE approval_status = 'PUBLISHED'
+        <if test="category != null and category != ''">AND category = #{category}</if>
+        <if test="status != null and status != ''">AND status = #{status}</if>
+        <if test="keyword != null and keyword != ''">
+            AND (title LIKE CONCAT('%', #{keyword}, '%')
+              OR venue_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+    <select id="findById" resultType="Performance">SELECT * FROM performance WHERE performance_id = #{performanceId}</select>
+    <select id="findByApiPerfId" resultType="Performance">SELECT * FROM performance WHERE api_perf_id = #{apiPerfId}</select>
+    <insert id="insert" parameterType="Performance" useGeneratedKeys="true" keyProperty="performanceId">
+        INSERT INTO performance (
+            api_perf_id, title, category, venue_id, venue_name, description,
+            poster_url, total_seats, ticket_open_at, start_date, end_date,
+            status, stage_config_id, promoter_id, approval_status
+        ) VALUES (
+            #{apiPerfId}, #{title}, #{category}, #{venueId}, #{venueName}, #{description},
+            #{posterUrl}, #{totalSeats}, #{ticketOpenAt}, #{startDate}, #{endDate},
+            #{status}, #{stageConfigId},
+            #{promoterId},
+            <choose>
+                <when test="approvalStatus != null">#{approvalStatus}</when>
+                <otherwise>'DRAFT'</otherwise>
+            </choose>
+        )
+    </insert>
+    <update id="update" parameterType="Performance">
+        UPDATE performance
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="totalSeats != 0">total_seats = #{totalSeats},</if>
+            <if test="stageConfigId != null">stage_config_id = #{stageConfigId},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="posterUrl != null">poster_url = #{posterUrl},</if>
+            <if test="venueName != null">venue_name = #{venueName},</if>
+            <if test="venueId != null">venue_id = #{venueId},</if>
+            <if test="startDate != null">start_date = #{startDate},</if>
+            <if test="endDate != null">end_date = #{endDate},</if>
+            <if test="ticketOpenAt != null">ticket_open_at = #{ticketOpenAt},</if>
+        </set>
+        WHERE performance_id = #{performanceId}
+    </update>
+    <select id="findSchedules" resultType="Schedule">
+        SELECT s.*, p.title AS performance_title, p.venue_name AS venue FROM schedule s
+        JOIN performance p ON s.performance_id = p.performance_id
+        WHERE s.performance_id = #{performanceId} ORDER BY s.show_date, s.show_time
+    </select>
+
+    <select id="findByPromoterIdAndApprovalStatus" resultType="com.ticketlegacy.domain.Performance">
+        SELECT p.*,
+               pr.company_name AS promoter_company_name
+        FROM performance p
+        LEFT JOIN promoter pr ON p.promoter_id = pr.promoter_id
+        WHERE p.promoter_id = #{promoterId}
+        <if test="approvalStatus != null and approvalStatus != ''">
+            AND p.approval_status = #{approvalStatus}
+        </if>
+        ORDER BY p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByPromoterIdAndApprovalStatus" resultType="int">
+        SELECT COUNT(*) FROM performance
+        WHERE promoter_id = #{promoterId}
+        <if test="approvalStatus != null and approvalStatus != ''">
+            AND approval_status = #{approvalStatus}
+        </if>
+    </select>
+
+    <select id="findAllByApprovalStatus" resultType="com.ticketlegacy.domain.Performance">
+        SELECT p.*,
+               pr.company_name AS promoter_company_name
+        FROM performance p
+        LEFT JOIN promoter pr ON p.promoter_id = pr.promoter_id
+        <if test="approvalStatus != null and approvalStatus != ''">
+            WHERE p.approval_status = #{approvalStatus}
+        </if>
+        ORDER BY p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAllByApprovalStatus" resultType="int">
+        SELECT COUNT(*) FROM performance
+        <if test="approvalStatus != null and approvalStatus != ''">
+            WHERE approval_status = #{approvalStatus}
+        </if>
+    </select>
+
+    <!--
+        ══════════════════════════════════════════════════════
+        스케줄러 자동 전환 쿼리
+        ══════════════════════════════════════════════════════
+    -->
+
+    <!--
+        티켓 오픈 시각이 된 APPROVED 공연 → PUBLISHED + ON_SALE 자동 전환
+        ticket_open_at 이 NULL인 공연은 SUPER_ADMIN이 수동 게시해야 함
+    -->
+    <update id="autoPublishApproved">
+        UPDATE performance
+        SET    approval_status = 'PUBLISHED',
+               status          = 'ON_SALE',
+               updated_at      = NOW()
+        WHERE  approval_status = 'APPROVED'
+          AND  ticket_open_at IS NOT NULL
+          AND  ticket_open_at &lt;= NOW()
+    </update>
+
+    <!--
+        종료일이 지난 공연 → ENDED 자동 전환
+        ON_SALE 또는 PUBLISHED 상태인 공연만 대상
+    -->
+    <update id="autoEndExpired">
+        UPDATE performance
+        SET    status      = 'ENDED',
+               updated_at  = NOW()
+        WHERE  status IN ('ON_SALE', 'UPCOMING')
+          AND  end_date IS NOT NULL
+          AND  end_date &lt; CURDATE()
+    </update>
+
+    <update id="updateApprovalStatus">
+        UPDATE performance
+        SET approval_status = #{approvalStatus},
+            approval_note   = #{approvalNote},
+            reviewed_by     = #{reviewedBy},
+            reviewed_at     = CASE WHEN #{reviewedBy} IS NOT NULL THEN NOW() ELSE reviewed_at END,
+            updated_at      = NOW()
+        WHERE performance_id = #{performanceId}
+    </update>
+</mapper>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.ScheduleMapper">
+    <select id="findByPerformanceId" resultType="Schedule">
+        SELECT s.*, p.title AS performance_title, p.venue_name AS venue,
+               p.venue_id, p.status AS performance_status, p.approval_status
+        FROM schedule s JOIN performance p ON s.performance_id=p.performance_id
+        WHERE s.performance_id=#{performanceId} ORDER BY s.show_date, s.show_time
+    </select>
+    <insert id="insert" parameterType="Schedule" useGeneratedKeys="true" keyProperty="scheduleId">
+        INSERT INTO schedule (performance_id, show_date, show_time, available_seats, status)
+        VALUES (#{performanceId}, #{showDate}, #{showTime}, 0, 'AVAILABLE')
+    </insert>
+    <update id="updateAvailableSeats">
+        UPDATE schedule SET available_seats=#{count} WHERE schedule_id=#{scheduleId}
+    </update>
+    <select id="findById" resultType="Schedule">
+        SELECT s.*, p.title AS performance_title, p.venue_name AS venue,
+               p.venue_id, p.status AS performance_status, p.approval_status
+        FROM schedule s
+        JOIN performance p ON s.performance_id=p.performance_id WHERE s.schedule_id=#{scheduleId}
+    </select>
+    <update id="decreaseAvailableSeats">
+        UPDATE schedule SET available_seats=available_seats-#{count}
+        WHERE schedule_id=#{scheduleId} AND available_seats >= #{count}
+    </update>
+    <update id="increaseAvailableSeats">
+        UPDATE schedule SET available_seats=available_seats+#{count} WHERE schedule_id=#{scheduleId}
+    </update>
+    <select id="findByVenueId" resultType="Schedule">
+        SELECT s.*, p.title AS performance_title, p.venue_name AS venue,
+               p.venue_id, p.status AS performance_status, p.approval_status
+        FROM schedule s
+        JOIN performance p ON s.performance_id = p.performance_id
+        WHERE p.venue_id = #{venueId}
+        ORDER BY s.show_date, s.show_time
+    </select>
+    <select id="findUpcomingByVenueId" resultType="Schedule">
+        SELECT s.*, p.title AS performance_title, p.venue_name AS venue,
+               p.venue_id, p.status AS performance_status, p.approval_status
+        FROM schedule s
+        JOIN performance p ON s.performance_id = p.performance_id
+        WHERE p.venue_id = #{venueId}
+          AND s.show_date >= CURDATE()
+        ORDER BY s.show_date, s.show_time
+        LIMIT #{limit}
+    </select>
+    <delete id="deleteById">
+        DELETE FROM schedule
+        WHERE schedule_id = #{scheduleId}
+    </delete>
+</mapper>

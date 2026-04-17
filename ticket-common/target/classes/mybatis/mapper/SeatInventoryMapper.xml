@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.SeatInventoryMapper">
+    <resultMap id="seatInventoryMap" type="SeatInventory">
+        <id property="inventoryId" column="inventory_id"/>
+        <result property="scheduleId" column="schedule_id"/><result property="seatId" column="seat_id"/>
+        <result property="status" column="inv_status"/><result property="holdType" column="hold_type"/>
+        <result property="heldBy" column="held_by"/>
+        <result property="heldUntil" column="held_until"/><result property="version" column="version"/>
+        <result property="section" column="section"/><result property="seatRow" column="seat_row"/>
+        <result property="seatNumber" column="seat_number"/><result property="grade" column="grade"/>
+        <result property="price" column="price"/>
+    </resultMap>
+    <select id="findByScheduleId" resultMap="seatInventoryMap">
+        SELECT si.inventory_id, si.schedule_id, si.seat_id, si.status AS inv_status,
+               si.hold_type, si.held_by, si.held_until, si.version,
+               s.section, s.seat_row, s.seat_number, s.grade, s.price
+        FROM seat_inventory si JOIN seat s ON si.seat_id = s.seat_id
+        WHERE si.schedule_id = #{scheduleId} ORDER BY s.section, s.seat_row, s.seat_number
+    </select>
+    <update id="holdSeat">
+        UPDATE seat_inventory SET status='HELD', held_by=#{memberId}, held_until=#{holdUntil}, version=version+1
+        WHERE schedule_id=#{scheduleId} AND seat_id=#{seatId} AND status='AVAILABLE'
+    </update>
+
+    <!-- 대량의 인벤토리 생성 (회차별 좌석) -->
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="inventoryId">
+        INSERT INTO seat_inventory (schedule_id, seat_id, status, hold_type)
+        VALUES
+        <foreach collection="inventories" item="inv" separator=",">
+            (#{inv.scheduleId}, #{inv.seatId}, #{inv.status},
+             <choose>
+               <when test="inv.holdType != null">#{inv.holdType}</when>
+               <otherwise>'PUBLIC'</otherwise>
+             </choose>)
+        </foreach>
+    </insert>
+    <update id="releaseSeat">
+        UPDATE seat_inventory SET status='AVAILABLE', held_by=NULL, held_until=NULL, version=version+1
+        WHERE schedule_id=#{scheduleId} AND seat_id=#{seatId} AND held_by=#{memberId} AND status='HELD'
+    </update>
+    <update id="updateToReserved">
+        UPDATE seat_inventory SET status='RESERVED', version=version+1
+        WHERE schedule_id=#{scheduleId} AND seat_id IN
+        <foreach collection="seatIds" item="seatId" open="(" separator="," close=")">#{seatId}</foreach>
+        AND status='HELD' AND held_by=#{memberId}
+    </update>
+    <update id="releaseExpiredHolds">
+        UPDATE seat_inventory SET status='AVAILABLE', held_by=NULL, held_until=NULL, version=version+1
+        WHERE status='HELD' AND held_until &lt; NOW()
+    </update>
+    <update id="releaseReservedSeats">
+        UPDATE seat_inventory SET status='AVAILABLE', held_by=NULL, held_until=NULL, version=version+1
+        WHERE schedule_id=#{scheduleId} AND status='RESERVED'
+        AND seat_id IN
+        <foreach collection="seatIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+    <update id="updateHoldType">
+        UPDATE seat_inventory SET hold_type=#{holdType}
+        WHERE schedule_id=#{scheduleId}
+        AND seat_id IN
+        <foreach collection="seatIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <select id="countPublicAvailable" resultType="int">
+        SELECT COUNT(*) FROM seat_inventory
+        WHERE schedule_id=#{scheduleId} AND status='AVAILABLE' AND hold_type='PUBLIC'
+    </select>
+
+    <select id="findBySeatInSchedule" resultMap="seatInventoryMap">
+        SELECT si.inventory_id, si.schedule_id, si.seat_id, si.status AS inv_status,
+               si.hold_type, si.held_by, si.held_until, si.version,
+               s.section, s.seat_row, s.seat_number, s.grade, s.price
+        FROM seat_inventory si JOIN seat s ON si.seat_id = s.seat_id
+        WHERE si.schedule_id = #{scheduleId} AND si.seat_id = #{seatId}
+        LIMIT 1
+    </select>
+
+    <select id="countReservedByScheduleId" resultType="int">
+        SELECT COUNT(*) FROM seat_inventory
+        WHERE schedule_id = #{scheduleId} AND status = 'RESERVED'
+    </select>
+
+    <select id="findByScheduleAndSeatIds" resultMap="seatInventoryMap">
+        SELECT si.inventory_id, si.schedule_id, si.seat_id, si.status AS inv_status,
+               si.held_by, si.held_until, si.version,
+               s.section, s.seat_row, s.seat_number, s.grade, s.price
+        FROM seat_inventory si
+        JOIN seat s ON si.seat_id = s.seat_id
+        WHERE si.schedule_id = #{scheduleId}
+        AND si.seat_id IN
+        <foreach collection="seatIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

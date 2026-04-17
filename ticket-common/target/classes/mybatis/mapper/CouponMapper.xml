@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.CouponMapper">
+
+    <!-- 쿠폰 템플릿 -->
+    <insert id="insertTemplate" parameterType="CouponTemplate" useGeneratedKeys="true" keyProperty="templateId">
+        INSERT INTO coupon_template
+            (promoter_id, performance_id, code_prefix, name, discount_type, discount_value,
+             min_amount, max_discount, total_quantity, valid_from, valid_until, is_active)
+        VALUES
+            (#{promoterId}, #{performanceId}, #{codePrefix}, #{name}, #{discountType}, #{discountValue},
+             #{minAmount}, #{maxDiscount}, #{totalQuantity}, #{validFrom}, #{validUntil}, 1)
+    </insert>
+
+    <select id="findTemplateById" resultType="CouponTemplate">
+        SELECT ct.*, pr.company_name AS promoter_company_name, p.title AS performance_title
+        FROM coupon_template ct
+        LEFT JOIN promoter pr ON ct.promoter_id = pr.promoter_id
+        LEFT JOIN performance p ON ct.performance_id = p.performance_id
+        WHERE ct.template_id = #{templateId}
+    </select>
+
+    <select id="findAllTemplates" resultType="CouponTemplate">
+        SELECT ct.*, pr.company_name AS promoter_company_name, p.title AS performance_title
+        FROM coupon_template ct
+        LEFT JOIN promoter pr ON ct.promoter_id = pr.promoter_id
+        LEFT JOIN performance p ON ct.performance_id = p.performance_id
+        <where>
+            <if test="promoterId != null">AND ct.promoter_id = #{promoterId}</if>
+            <if test="isActive != null">AND ct.is_active = #{isActive}</if>
+        </where>
+        ORDER BY ct.created_at DESC
+    </select>
+
+    <update id="updateTemplateActive">
+        UPDATE coupon_template SET is_active = #{isActive}, updated_at = NOW()
+        WHERE template_id = #{templateId}
+    </update>
+
+    <update id="incrementIssuedCount">
+        UPDATE coupon_template SET issued_count = issued_count + 1 WHERE template_id = #{templateId}
+    </update>
+
+    <!-- 발급 쿠폰 -->
+    <insert id="insertCoupon" parameterType="Coupon" useGeneratedKeys="true" keyProperty="couponId">
+        INSERT INTO coupon (template_id, member_id, coupon_code, status, expires_at)
+        VALUES (#{templateId}, #{memberId}, #{couponCode}, 'ISSUED', #{expiresAt})
+    </insert>
+
+    <select id="findByCode" resultType="Coupon">
+        SELECT c.*, ct.name AS template_name, ct.discount_type, ct.discount_value,
+               ct.min_amount, ct.max_discount,
+               m.name AS member_name, m.email AS member_email
+        FROM coupon c
+        JOIN coupon_template ct ON c.template_id = ct.template_id
+        JOIN member m ON c.member_id = m.member_id
+        WHERE c.coupon_code = #{couponCode}
+    </select>
+
+    <select id="findByMemberId" resultType="Coupon">
+        SELECT c.*, ct.name AS template_name, ct.discount_type, ct.discount_value,
+               ct.min_amount, ct.max_discount
+        FROM coupon c
+        JOIN coupon_template ct ON c.template_id = ct.template_id
+        WHERE c.member_id = #{memberId}
+        ORDER BY c.issued_at DESC
+    </select>
+
+    <update id="useCoupon">
+        UPDATE coupon
+        SET status = 'USED', used_at = NOW(), reservation_id = #{reservationId}
+        WHERE coupon_code = #{couponCode} AND status = 'ISSUED' AND expires_at > NOW()
+    </update>
+
+    <update id="expireOverdueCoupons">
+        UPDATE coupon SET status = 'EXPIRED'
+        WHERE status = 'ISSUED' AND expires_at &lt;= NOW()
+    </update>
+
+    <select id="countIssuedByTemplate" resultType="int">
+        SELECT COUNT(*) FROM coupon WHERE template_id = #{templateId}
+    </select>
+
+    <select id="countUsedByTemplate" resultType="int">
+        SELECT COUNT(*) FROM coupon WHERE template_id = #{templateId} AND status = 'USED'
+    </select>
+
+</mapper>

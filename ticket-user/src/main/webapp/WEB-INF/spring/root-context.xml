@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xsi:schemaLocation="
+           http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/context
+           http://www.springframework.org/schema/context/spring-context.xsd
+           http://www.springframework.org/schema/tx
+           http://www.springframework.org/schema/tx/spring-tx.xsd
+           http://www.springframework.org/schema/aop
+           http://www.springframework.org/schema/aop/spring-aop.xsd
+           http://www.springframework.org/schema/task
+           http://www.springframework.org/schema/task/spring-task.xsd">
+
+    <!-- ticket-common + ticket-user 서비스/레포지토리 스캔 (Controller 제외) -->
+    <context:component-scan base-package="com.ticketlegacy">
+        <context:exclude-filter type="annotation"
+            expression="org.springframework.stereotype.Controller" />
+    </context:component-scan>
+
+    <!-- DataSource (HikariCP) -->
+    <bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
+        <property name="driverClassName" value="com.mysql.cj.jdbc.Driver" />
+        <property name="jdbcUrl"
+                  value="jdbc:mysql://localhost:3306/springgreen6?useSSL=false&amp;serverTimezone=Asia/Seoul&amp;characterEncoding=UTF-8&amp;allowPublicKeyRetrieval=true" />
+        <property name="username" value="root" />
+        <property name="password" value="1234" />
+        <property name="maximumPoolSize" value="10" />
+        <property name="minimumIdle" value="2" />
+        <property name="connectionTimeout" value="10000" />
+        <property name="idleTimeout" value="300000" />
+        <property name="maxLifetime" value="600000" />
+    </bean>
+
+    <!-- MyBatis -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource" />
+        <property name="configLocation" value="classpath:mybatis/mybatis-config.xml" />
+        <property name="mapperLocations" value="classpath:mybatis/mapper/**/*.xml" />
+    </bean>
+
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.ticketlegacy.repository" />
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+    </bean>
+
+    <!-- 트랜잭션 -->
+    <bean id="transactionManager"
+          class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource" />
+    </bean>
+    <tx:annotation-driven transaction-manager="transactionManager" />
+
+    <!-- AOP -->
+    <aop:aspectj-autoproxy />
+
+    <!-- 비동기 + 스케줄링 (QueueService @Scheduled 사용) -->
+    <task:annotation-driven executor="asyncExecutor" scheduler="taskScheduler" />
+    <task:executor id="asyncExecutor" pool-size="5-20" queue-capacity="100" rejection-policy="CALLER_RUNS" />
+    <task:scheduler id="taskScheduler" pool-size="3" />
+
+    <!-- Jackson ObjectMapper — Spring FactoryBean으로 JavaTimeModule 등록 -->
+    <bean id="objectMapper"
+          class="org.springframework.http.converter.json.Jackson2ObjectMapperFactoryBean">
+        <property name="modulesToInstall">
+            <list>
+                <value>com.fasterxml.jackson.datatype.jsr310.JavaTimeModule</value>
+            </list>
+        </property>
+    </bean>
+
+    <!-- Redis (Lettuce) — ticket-user 필수 의존성 -->
+    <bean id="redisConnectionFactory"
+          class="org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory">
+        <property name="hostName" value="localhost" />
+        <property name="port" value="6379" />
+    </bean>
+
+    <bean id="stringRedisTemplate"
+          class="org.springframework.data.redis.core.StringRedisTemplate">
+        <constructor-arg ref="redisConnectionFactory" />
+    </bean>
+
+</beans>

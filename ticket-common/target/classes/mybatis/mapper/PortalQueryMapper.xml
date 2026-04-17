@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.PortalQueryMapper">
+    <select id="findPromoterFinancialSummary" resultType="map">
+        SELECT COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN 1 ELSE 0 END), 0) AS confirmed_reservations,
+               COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END), 0) AS gross_sales,
+               COALESCE(SUM(CASE WHEN r.status IN ('CANCELLED', 'REFUNDED') THEN 1 ELSE 0 END), 0) AS refund_count
+        FROM performance p
+        LEFT JOIN schedule sc ON sc.performance_id = p.performance_id
+        LEFT JOIN reservation r ON r.schedule_id = sc.schedule_id
+        WHERE p.promoter_id = #{promoterId}
+    </select>
+
+    <select id="findPromoterSalesRows" resultType="map">
+        SELECT p.performance_id,
+               p.title AS performance_title,
+               p.venue_name,
+               p.approval_status,
+               p.status,
+               COUNT(DISTINCT sc.schedule_id) AS schedule_count,
+               COALESCE(MIN(sc.show_date), p.start_date) AS first_show_date,
+               COALESCE(MAX(sc.show_date), p.end_date) AS last_show_date,
+               COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN 1 ELSE 0 END), 0) AS confirmed_reservations,
+               COALESCE(SUM(CASE WHEN r.status IN ('CANCELLED', 'REFUNDED') THEN 1 ELSE 0 END), 0) AS cancelled_reservations,
+               COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END), 0) AS gross_sales,
+               COALESCE(ROUND(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END) * 0.9), 0) AS settlement_amount
+        FROM performance p
+        LEFT JOIN schedule sc ON sc.performance_id = p.performance_id
+        LEFT JOIN reservation r ON r.schedule_id = sc.schedule_id
+        WHERE p.promoter_id = #{promoterId}
+        GROUP BY p.performance_id, p.title, p.venue_name, p.approval_status, p.status, p.start_date, p.end_date
+        ORDER BY p.created_at DESC
+    </select>
+
+    <select id="findSettlementRows" resultType="map">
+        SELECT DATE_FORMAT(sc.show_date, '%Y-%m') AS year_month,
+               pr.promoter_id,
+               pr.company_name AS promoter_company_name,
+               p.performance_id,
+               p.title AS performance_title,
+               p.venue_name,
+               COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN 1 ELSE 0 END), 0) AS confirmed_reservations,
+               COALESCE(SUM(CASE WHEN r.status IN ('CANCELLED', 'REFUNDED') THEN 1 ELSE 0 END), 0) AS cancelled_reservations,
+               COALESCE(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END), 0) AS gross_sales,
+               COALESCE(ROUND(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END) * 0.1), 0) AS platform_fee,
+               COALESCE(ROUND(SUM(CASE WHEN r.status = 'CONFIRMED' THEN r.total_amount ELSE 0 END) * 0.9), 0) AS payable_amount
+        FROM performance p
+        LEFT JOIN promoter pr ON p.promoter_id = pr.promoter_id
+        LEFT JOIN schedule sc ON sc.performance_id = p.performance_id
+        LEFT JOIN reservation r ON r.schedule_id = sc.schedule_id
+        <where>
+            <if test="promoterId != null">
+                p.promoter_id = #{promoterId}
+            </if>
+            <if test="yearMonth != null and yearMonth != ''">
+                AND DATE_FORMAT(sc.show_date, '%Y-%m') = #{yearMonth}
+            </if>
+        </where>
+        GROUP BY DATE_FORMAT(sc.show_date, '%Y-%m'),
+                 pr.promoter_id, pr.company_name,
+                 p.performance_id, p.title, p.venue_name
+        ORDER BY year_month DESC, gross_sales DESC, p.performance_id DESC
+    </select>
+
+    <select id="findEntranceCandidates" resultType="map">
+        SELECT r.reservation_id,
+               r.reservation_no,
+               r.status,
+               r.seat_count,
+               r.total_amount,
+               m.name AS member_name,
+               m.phone AS member_phone,
+               p.title AS performance_title,
+               sc.show_date,
+               sc.show_time,
+               el.checked_in_at,
+               GROUP_CONCAT(
+                   CONCAT(s.section, '-', s.seat_row, s.seat_number)
+                   ORDER BY s.section, s.seat_row, s.seat_number SEPARATOR ', '
+               ) AS seat_summary
+        FROM reservation r
+        JOIN member m ON r.member_id = m.member_id
+        JOIN schedule sc ON r.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        LEFT JOIN entrance_log el ON el.reservation_id = r.reservation_id
+        LEFT JOIN reservation_seat rs ON rs.reservation_id = r.reservation_id
+        LEFT JOIN seat s ON s.seat_id = rs.seat_id
+        WHERE p.venue_id = #{venueId}
+          AND r.status = 'CONFIRMED'
+        <if test="showDate != null and showDate != ''">
+            AND DATE_FORMAT(sc.show_date, '%Y-%m-%d') = #{showDate}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                r.reservation_no LIKE CONCAT('%', #{keyword}, '%')
+                OR m.name LIKE CONCAT('%', #{keyword}, '%')
+                OR m.phone LIKE CONCAT('%', #{keyword}, '%')
+                OR p.title LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        GROUP BY r.reservation_id, r.reservation_no, r.status, r.seat_count, r.total_amount,
+                 m.name, m.phone, p.title, sc.show_date, sc.show_time, el.checked_in_at
+        ORDER BY sc.show_date, sc.show_time, r.created_at DESC
+    </select>
+</mapper>

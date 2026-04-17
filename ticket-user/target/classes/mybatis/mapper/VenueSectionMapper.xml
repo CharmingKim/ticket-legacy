@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.VenueSectionMapper">
+
+    <insert id="insert" parameterType="VenueSection" useGeneratedKeys="true" keyProperty="sectionId">
+        INSERT INTO venue_section (venue_id, section_name, section_type, total_rows, seats_per_row, display_order)
+        VALUES (#{venueId}, #{sectionName}, #{sectionType}, #{totalRows}, #{seatsPerRow}, #{displayOrder})
+    </insert>
+
+    <select id="findByVenueId" resultType="VenueSection">
+        SELECT vs.*,
+               (SELECT COUNT(*) FROM venue_seat_template vst WHERE vst.section_id = vs.section_id) AS template_count
+        FROM venue_section vs
+        WHERE vs.venue_id = #{venueId}
+        ORDER BY vs.display_order, vs.section_id
+    </select>
+
+    <select id="findById" resultType="VenueSection">
+        SELECT * FROM venue_section WHERE section_id = #{sectionId}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM venue_section WHERE section_id = #{sectionId}
+    </delete>
+
+    <delete id="deleteByVenueId">
+        DELETE FROM venue_section WHERE venue_id = #{venueId}
+    </delete>
+
+</mapper>

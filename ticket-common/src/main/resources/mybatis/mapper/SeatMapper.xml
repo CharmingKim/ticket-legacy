@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.SeatMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="seatId">
+        INSERT INTO seat (performance_id, section, seat_row, seat_number, grade, price)
+        VALUES (#{performanceId}, #{section}, #{seatRow}, #{seatNumber}, #{grade}, #{price})
+    </insert>
+
+    <!-- 대량 좌석 생성 쿼리 최적화 -->
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="seatId">
+        INSERT INTO seat (performance_id, section, seat_row, seat_number, grade, price)
+        VALUES
+        <foreach collection="seats" item="s" separator=",">
+            (#{s.performanceId}, #{s.section}, #{s.seatRow}, #{s.seatNumber}, #{s.grade}, #{s.price})
+        </foreach>
+    </insert>
+
+    <select id="findByPerformanceId" resultType="com.ticketlegacy.domain.Seat">
+        SELECT * FROM seat WHERE performance_id = #{performanceId}
+    </select>
+
+    <delete id="deleteByPerformanceId">
+        DELETE FROM seat WHERE performance_id = #{performanceId}
+    </delete>
+
+</mapper>

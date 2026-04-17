@@ -1,0 +1,15 @@
+com\ticketlegacy\web\controller\SuperAdminController.class
+com\ticketlegacy\web\controller\BackofficeCouponController.class
+com\ticketlegacy\web\interceptor\AuthInterceptor.class
+com\ticketlegacy\web\support\AuthMember.class
+com\ticketlegacy\web\controller\BackofficeStaffController.class
+com\ticketlegacy\web\controller\AdminController.class
+com\ticketlegacy\web\support\LoginUser.class
+com\ticketlegacy\web\filter\JwtAuthenticationFilter.class
+com\ticketlegacy\web\controller\BackofficeSuperController.class
+com\ticketlegacy\web\filter\AjaxAwareAuthEntryPoint.class
+com\ticketlegacy\web\controller\BackofficeAnalyticsController.class
+com\ticketlegacy\web\controller\AdminLoginController.class
+com\ticketlegacy\web\advice\GlobalExceptionHandler.class
+com\ticketlegacy\web\support\AuthMemberArgumentResolver.class
+com\ticketlegacy\web\controller\BackofficeSuperAnalyticsController.class

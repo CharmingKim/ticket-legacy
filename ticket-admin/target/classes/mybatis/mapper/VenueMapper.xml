@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.VenueMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="venueId">
+        INSERT INTO venue (api_facility_id, name, address, seat_scale)
+        VALUES (#{apiFacilityId}, #{name}, #{address}, #{seatScale})
+    </insert>
+
+    <update id="update">
+        UPDATE venue
+        SET name = #{name},
+            address = #{address},
+            seat_scale = #{seatScale}
+        WHERE venue_id = #{venueId}
+    </update>
+
+    <select id="findById" resultType="com.ticketlegacy.domain.Venue">
+        SELECT * FROM venue WHERE venue_id = #{venueId}
+    </select>
+
+    <select id="findByApiId" resultType="com.ticketlegacy.domain.Venue">
+        SELECT *
+        FROM venue
+        WHERE api_facility_id = #{apiFacilityId}
+    </select>
+
+    <select id="findAll" resultType="com.ticketlegacy.domain.Venue">
+        SELECT *
+        FROM venue
+        ORDER BY name ASC
+    </select>
+
+</mapper>
