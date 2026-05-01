@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,6 +27,33 @@ public class AdminPerformanceService {
     private final VenueStageSectionMapper venueStageSectionMapper;
     private final PerformanceSeatGradeMapper performanceSeatGradeMapper;
     private final PerformanceSectionOverrideMapper performanceSectionOverrideMapper;
+
+    // ─────────────────────────────────────────────────
+    // 회차(Schedule) 관리
+    // ─────────────────────────────────────────────────
+
+    public List<Schedule> findSchedulesByPerformanceId(Long performanceId) {
+        return scheduleMapper.findByPerformanceId(performanceId);
+    }
+
+    @Transactional
+    public Schedule createSchedule(Long performanceId, LocalDate showDate, LocalTime showTime) {
+        Schedule s = new Schedule();
+        s.setPerformanceId(performanceId);
+        s.setShowDate(showDate);
+        s.setShowTime(showTime);
+        scheduleMapper.insert(s);
+        log.info("회차 등록: scheduleId={}, performanceId={}, date={}", s.getScheduleId(), performanceId, showDate);
+        return s;
+    }
+
+    // ─────────────────────────────────────────────────
+    // 공연별 구역 오버라이드 조회
+    // ─────────────────────────────────────────────────
+
+    public List<PerformanceSectionOverride> findSectionOverrides(Long performanceId) {
+        return performanceSectionOverrideMapper.findByPerformanceId(performanceId);
+    }
 
     // ─────────────────────────────────────────────────
     // 공연별 등급/가격 설정

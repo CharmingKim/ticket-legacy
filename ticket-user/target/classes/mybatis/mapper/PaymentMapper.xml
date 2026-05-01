@@ -23,11 +23,11 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO payment (
             reservation_id, member_id, amount, coupon_id,
-            discount_amount, final_amount, status, idempotency_key,
+            discount_amount, final_amount, method, status, idempotency_key,
             created_at
         ) VALUES (
-            #{reservationId}, #{memberId}, #{amount}, #{couponId},
-            #{discountAmount}, #{finalAmount}, #{status}, #{idempotencyKey},
+            #{reservationId}, #{memberId}, #{amount}, #{couponId,jdbcType=BIGINT},
+            #{discountAmount}, #{finalAmount}, #{method}, #{status}, #{idempotencyKey},
             NOW()
         )
     </insert>

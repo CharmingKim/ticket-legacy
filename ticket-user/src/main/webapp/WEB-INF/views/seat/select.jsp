@@ -132,7 +132,7 @@ function renderSeatMap(seats) {
     for (const [sec, seatList] of Object.entries(sections)) {
         html += `<div class="mb-4">
             <div class="d-flex align-items-center gap-2 mb-2">
-                <span style="font-size:.85rem;font-weight:700;color:var(--gray-600)">${sec} 구역</span>
+                <span style="font-size:.85rem;font-weight:700;color:var(--gray-600)">\${sec} 구역</span>
             </div>
             <div class="tl-seat-grid">`;
 
@@ -149,15 +149,15 @@ function renderSeatMap(seats) {
             rowSeats.forEach(s => {
                 const cls = getSeatClass(s);
                 const label = row + s.seatNumber;
-                html += `<button class="tl-seat ${cls}"
-                    data-seat-id="${s.seatId}"
-                    data-label="${label}"
-                    data-price="${s.price}"
-                    data-grade="${s.grade}"
-                    data-status="${s.status}"
-                    data-expires="${s.expiresAt || ''}"
-                    title="${label} (${s.grade}) ₩${(s.price||0).toLocaleString()}"
-                    >${label}</button>`;
+                html += `<button class="tl-seat \${cls}"
+                    data-seat-id="\${s.seatId}"
+                    data-label="\${label}"
+                    data-price="\${s.price}"
+                    data-grade="\${s.grade}"
+                    data-status="\${s.status}"
+                    data-expires="\${s.expiresAt || ''}"
+                    title="\${label} (\${s.grade}) ₩\${(s.price||0).toLocaleString()}"
+                    >\${label}</button>`;
             });
             html += '<div style="width:100%;height:0"></div>'; // row break
         }
@@ -167,10 +167,25 @@ function renderSeatMap(seats) {
 
     $('#seatMapContainer').html(html);
 
+    // Server-side MY_HOLD 좌석을 클라이언트 state 로 복원 (페이지 재진입 시)
+    seats.filter(s => s.status === 'MY_HOLD').forEach(s => {
+        const idStr = String(s.seatId);
+        if (!selectedSeats[idStr]) {
+            selectedSeats[idStr] = {
+                seatId:    idStr,
+                label:     (s.seatRow || 'A') + s.seatNumber,
+                price:     s.price,
+                grade:     s.grade,
+                expiresAt: s.expiresAt
+            };
+        }
+    });
+
     // Re-mark already selected seats
     for (const seatId of Object.keys(selectedSeats)) {
         $('[data-seat-id="' + seatId + '"]').addClass('my-hold');
     }
+    updateSummary();
 
     // Start hold timer if any holds
     const myHolds = seats.filter(s => s.status === 'MY_HOLD');
@@ -257,12 +272,12 @@ function updateSummary() {
         total += (s.price || 0);
         html += `<div class="tl-selected-seat">
             <div>
-                <div class="seat-label">${s.label}</div>
-                <div style="font-size:.78rem;color:var(--text-muted)">${s.grade}</div>
+                <div class="seat-label">\${s.label}</div>
+                <div style="font-size:.78rem;color:var(--text-muted)">\${s.grade}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <span style="font-weight:700;font-size:.9rem">${(s.price||0).toLocaleString()}원</span>
-                <button class="remove-btn" data-seat-id="${s.seatId}" title="제거">
+                <span style="font-weight:700;font-size:.9rem">\${(s.price||0).toLocaleString()}원</span>
+                <button class="remove-btn" data-seat-id="\${s.seatId}" title="제거">
                     <i class="bi bi-x"></i>
                 </button>
             </div>

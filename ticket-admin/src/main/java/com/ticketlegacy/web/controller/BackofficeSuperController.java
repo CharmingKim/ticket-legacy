@@ -1,16 +1,33 @@
 package com.ticketlegacy.web.controller;
 
 import com.ticketlegacy.domain.*;
-import com.ticketlegacy.repository.*;
+import com.ticketlegacy.dto.request.MemberSearchQuery;
+import com.ticketlegacy.dto.request.MemberStatusCommand;
+import com.ticketlegacy.dto.request.PromoterRejectCommand;
+import com.ticketlegacy.dto.request.PromoterSearchQuery;
+import com.ticketlegacy.dto.request.RegisterPromoterCommand;
+import com.ticketlegacy.dto.request.PerformanceReviewCommand;
+import com.ticketlegacy.dto.request.PerformanceSearchQuery;
+import com.ticketlegacy.dto.request.RegisterVenueManagerCommand;
+import com.ticketlegacy.dto.request.VenueManagerSearchQuery;
+import com.ticketlegacy.dto.response.ApiResponse;
+import com.ticketlegacy.dto.response.MemberSummaryDto;
+import com.ticketlegacy.dto.response.PageResponse;
+import com.ticketlegacy.dto.response.PerformanceSummaryDto;
+import com.ticketlegacy.dto.response.PromoterSummaryDto;
+import com.ticketlegacy.dto.response.VenueManagerSummaryDto;
+import com.ticketlegacy.exception.BusinessException;
+import com.ticketlegacy.exception.ErrorCode;
 import com.ticketlegacy.service.*;
-import java.time.YearMonth;
 import com.ticketlegacy.web.support.AuthMember;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -41,15 +58,7 @@ public class BackofficeSuperController {
     @Autowired private VenueAdminService          venueAdminService;
     @Autowired private AdminPerformanceService    adminPerformanceService;
     @Autowired private MemberService              memberService;
-    @Autowired private MemberMapper               memberMapper;
-    @Autowired private ScheduleMapper             scheduleMapper;
-    @Autowired private PerformanceMapper          performanceMapper;
-    @Autowired private PerformanceSeatGradeMapper performanceSeatGradeMapper;
-    @Autowired private VenueStageConfigMapper     venueStageConfigMapper;
-    @Autowired private VenueStageSectionMapper    venueStageSectionMapper;
-    @Autowired private PerformanceSectionOverrideMapper performanceSectionOverrideMapper;
-    @Autowired private ReservationMapper          reservationMapper;
-    @Autowired private PortalQueryMapper          portalQueryMapper;
+    @Autowired private PortalDashboardService     portalDashboardService;
 
     // ─────────────────────────────────────────────
     // 대시보드
@@ -57,13 +66,66 @@ public class BackofficeSuperController {
 
     @GetMapping("/dashboard")
     public String dashboard(Model model) {
-        model.addAttribute("pendingPromoterCount",   promoterService.countByStatus("PENDING"));
-        model.addAttribute("pendingVmCount",         venueManagerService.countByStatus("PENDING"));
-        model.addAttribute("reviewPerformanceCount", performanceApprovalService.countAll("REVIEW"));
+        Map<String, Object> summary = portalDashboardService.getBackofficeSummary();
+        model.addAttribute("pendingPromoterCount",   summary.get("pendingPromoters"));
+        model.addAttribute("pendingVmCount",         summary.get("pendingVenueManagers"));
+        model.addAttribute("reviewPerformanceCount", summary.get("reviewPerformances"));
         model.addAttribute("venues",                 venueAdminService.findAllVenues());
-        model.addAttribute("totalMemberCount",       memberMapper.countAll());
-        model.addAttribute("todayReservationCount",  reservationMapper.countToday());
+        model.addAttribute("totalMemberCount",       summary.get("totalMembers"));
+        model.addAttribute("todayReservationCount",  summary.get("todayReservations"));
         return "backoffice/super/dashboard";
+    }
+
+    @GetMapping("/api/dashboard/summary")
+    @ResponseBody
+    public ResponseEntity<?> dashboardSummary() {
+        return ResponseEntity.ok(portalDashboardService.getBackofficeSummary());
+    }
+
+    @GetMapping("/api/dashboard/promoters")
+    @ResponseBody
+    public ResponseEntity<List<PromoterSummaryDto>> dashboardPromoters() {
+        PromoterSearchQuery pendingQ  = new PromoterSearchQuery();
+        pendingQ.setStatus("PENDING"); pendingQ.setPage(1); pendingQ.setSize(10);
+        PromoterSearchQuery approvedQ = new PromoterSearchQuery();
+        approvedQ.setStatus("APPROVED"); approvedQ.setPage(1); approvedQ.setSize(10);
+
+        List<PromoterSummaryDto> merged = new java.util.ArrayList<>();
+        merged.addAll(promoterService.searchPromoters(pendingQ).getContent());
+        merged.addAll(promoterService.searchPromoters(approvedQ).getContent());
+        return ResponseEntity.ok(merged);
+    }
+
+    @GetMapping("/api/dashboard/venue-managers")
+    @ResponseBody
+    public ResponseEntity<List<VenueManagerSummaryDto>> dashboardVenueManagers() {
+        VenueManagerSearchQuery pendingQ  = new VenueManagerSearchQuery();
+        pendingQ.setStatus("PENDING"); pendingQ.setPage(1); pendingQ.setSize(10);
+        VenueManagerSearchQuery approvedQ = new VenueManagerSearchQuery();
+        approvedQ.setStatus("APPROVED"); approvedQ.setPage(1); approvedQ.setSize(10);
+
+        List<VenueManagerSummaryDto> merged = new java.util.ArrayList<>();
+        merged.addAll(venueManagerService.searchVenueManagers(pendingQ).getContent());
+        merged.addAll(venueManagerService.searchVenueManagers(approvedQ).getContent());
+        return ResponseEntity.ok(merged);
+    }
+
+    @GetMapping("/api/dashboard/review-performances")
+    @ResponseBody
+    public ResponseEntity<?> dashboardReviewPerformances() {
+        return ResponseEntity.ok(performanceApprovalService.findAll("REVIEW", 1, 20));
+    }
+
+    @GetMapping("/api/dashboard/venues")
+    @ResponseBody
+    public ResponseEntity<?> dashboardVenues() {
+        return ResponseEntity.ok(venueAdminService.findAllVenues());
+    }
+
+    @GetMapping("/api/dashboard/recent-reservations")
+    @ResponseBody
+    public ResponseEntity<?> dashboardRecentReservations() {
+        return ResponseEntity.ok(portalDashboardService.getRecentReservations(10));
     }
 
     // ─────────────────────────────────────────────
@@ -78,13 +140,16 @@ public class BackofficeSuperController {
     @GetMapping("/api/statistics/summary")
     @ResponseBody
     public ResponseEntity<?> statisticsSummary() {
+        Map<String, Object> bs = portalDashboardService.getBackofficeSummary();
         Map<String, Object> summary = Map.of(
-            "totalMembers",      memberMapper.countAll(),
+            "totalMembers",      bs.get("totalMembers"),
             "totalPromoters",    promoterService.countByStatus(null),
             "totalPerformances", performanceApprovalService.countAll(null),
             "totalVenues",       venueAdminService.findAllVenues().size(),
-            "todayReservations", reservationMapper.countToday(),
-            "pendingApprovals",  promoterService.countByStatus("PENDING") + venueManagerService.countByStatus("PENDING") + performanceApprovalService.countAll("REVIEW")
+            "todayReservations", bs.get("todayReservations"),
+            "pendingApprovals",  promoterService.countByStatus("PENDING")
+                                     + venueManagerService.countByStatus("PENDING")
+                                     + performanceApprovalService.countAll("REVIEW")
         );
         return ResponseEntity.ok(summary);
     }
@@ -100,23 +165,22 @@ public class BackofficeSuperController {
 
     @GetMapping("/api/members")
     @ResponseBody
-    public ResponseEntity<?> listMembers(
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(defaultValue = "1") int page) {
-        List<Member> list  = memberMapper.findAll(role, status, keyword, (page - 1) * 20, 20);
-        int          total = memberMapper.countFiltered(role, status, keyword);
-        return ResponseEntity.ok(Map.of("list", list, "total", total, "page", page));
+    public ResponseEntity<ApiResponse<PageResponse<MemberSummaryDto>>> listMembers(
+            @Valid @ModelAttribute MemberSearchQuery query) {
+        return ResponseEntity.ok(ApiResponse.success(memberService.searchMembers(query)));
     }
 
     @PostMapping("/api/members/{memberId}/status")
     @ResponseBody
-    public ResponseEntity<?> updateMemberStatus(@PathVariable Long memberId,
-                                                 @RequestBody Map<String, String> body) {
-        String status = body.get("status");
-        memberMapper.updateStatus(memberId, status);
-        return ResponseEntity.ok(Map.of("message", "회원 상태가 변경되었습니다."));
+    public ResponseEntity<ApiResponse<Void>> updateMemberStatus(
+            @PathVariable Long memberId,
+            @Valid @RequestBody MemberStatusCommand command,
+            @AuthMember Long adminMemberId) {
+        if (memberId.equals(adminMemberId)) {
+            throw new BusinessException(ErrorCode.MEMBER_CANNOT_MODIFY_SELF);
+        }
+        memberService.updateAdminStatus(memberId, command.getStatus(), adminMemberId, command.getReason());
+        return ResponseEntity.ok(ApiResponse.successMessage("회원 상태가 변경되었습니다."));
     }
 
     // ─────────────────────────────────────────────
@@ -125,37 +189,42 @@ public class BackofficeSuperController {
 
     @GetMapping("/api/promoters")
     @ResponseBody
-    public ResponseEntity<?> listPromoters(
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "1") int page) {
-        List<Promoter> list  = promoterService.findByStatus(status, page, 20);
-        int            total = promoterService.countByStatus(status);
-        return ResponseEntity.ok(Map.of("list", list, "total", total, "page", page));
+    public ResponseEntity<ApiResponse<PageResponse<PromoterSummaryDto>>> listPromoters(
+            @Valid @ModelAttribute PromoterSearchQuery query) {
+        return ResponseEntity.ok(ApiResponse.success(promoterService.searchPromoters(query)));
+    }
+
+    @PostMapping("/api/promoters")
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Void>> createPromoter(
+            @Valid @RequestBody RegisterPromoterCommand command) {
+        promoterService.registerPromoter(command);
+        return ResponseEntity.ok(ApiResponse.successMessage("기획사 계정이 등록되었습니다. (승인 대기)"));
     }
 
     @PostMapping("/api/promoters/{promoterId}/approve")
     @ResponseBody
-    public ResponseEntity<?> approvePromoter(@PathVariable Long promoterId,
-                                              @AuthMember Long adminMemberId) {
+    public ResponseEntity<ApiResponse<Void>> approvePromoter(@PathVariable Long promoterId,
+                                                              @AuthMember Long adminMemberId) {
         promoterService.approvePromoter(promoterId, adminMemberId);
-        return ResponseEntity.ok(Map.of("message", "기획사가 승인되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("기획사가 승인되었습니다."));
     }
 
     @PostMapping("/api/promoters/{promoterId}/reject")
     @ResponseBody
-    public ResponseEntity<?> rejectPromoter(@PathVariable Long promoterId,
-                                             @RequestBody Map<String, String> body,
-                                             @AuthMember Long adminMemberId) {
-        promoterService.rejectPromoter(promoterId, adminMemberId, body.getOrDefault("reason", ""));
-        return ResponseEntity.ok(Map.of("message", "기획사가 반려되었습니다."));
+    public ResponseEntity<ApiResponse<Void>> rejectPromoter(@PathVariable Long promoterId,
+                                                             @Valid @RequestBody PromoterRejectCommand command,
+                                                             @AuthMember Long adminMemberId) {
+        promoterService.rejectPromoter(promoterId, adminMemberId, command.getReason());
+        return ResponseEntity.ok(ApiResponse.successMessage("기획사가 반려되었습니다."));
     }
 
     @PostMapping("/api/promoters/{promoterId}/suspend")
     @ResponseBody
-    public ResponseEntity<?> suspendPromoter(@PathVariable Long promoterId,
-                                              @AuthMember Long adminMemberId) {
+    public ResponseEntity<ApiResponse<Void>> suspendPromoter(@PathVariable Long promoterId,
+                                                              @AuthMember Long adminMemberId) {
         promoterService.suspendPromoter(promoterId, adminMemberId);
-        return ResponseEntity.ok(Map.of("message", "기획사가 정지되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("기획사가 정지되었습니다."));
     }
 
     // ─────────────────────────────────────────────
@@ -164,28 +233,33 @@ public class BackofficeSuperController {
 
     @GetMapping("/api/venue-managers")
     @ResponseBody
-    public ResponseEntity<?> listVenueManagers(
-            @RequestParam(required = false, defaultValue = "PENDING") String status,
-            @RequestParam(defaultValue = "1") int page) {
-        List<VenueManager> list  = venueManagerService.findByStatus(status, page, 20);
-        int                total = venueManagerService.countByStatus(status);
-        return ResponseEntity.ok(Map.of("list", list, "total", total, "page", page));
+    public ResponseEntity<ApiResponse<PageResponse<VenueManagerSummaryDto>>> listVenueManagers(
+            @Valid @ModelAttribute VenueManagerSearchQuery query) {
+        return ResponseEntity.ok(ApiResponse.success(venueManagerService.searchVenueManagers(query)));
+    }
+
+    @PostMapping("/api/venue-managers")
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Void>> createVenueManager(
+            @Valid @RequestBody RegisterVenueManagerCommand command) {
+        venueManagerService.registerVenueManager(command);
+        return ResponseEntity.ok(ApiResponse.successMessage("공연장 담당자 계정이 등록되었습니다. (승인 대기)"));
     }
 
     @PostMapping("/api/venue-managers/{managerId}/approve")
     @ResponseBody
-    public ResponseEntity<?> approveVenueManager(@PathVariable Long managerId,
-                                                  @AuthMember Long adminMemberId) {
+    public ResponseEntity<ApiResponse<Void>> approveVenueManager(@PathVariable Long managerId,
+                                                                   @AuthMember Long adminMemberId) {
         venueManagerService.approveVenueManager(managerId, adminMemberId);
-        return ResponseEntity.ok(Map.of("message", "공연장 담당자가 승인되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("공연장 담당자가 승인되었습니다."));
     }
 
     @PostMapping("/api/venue-managers/{managerId}/reject")
     @ResponseBody
-    public ResponseEntity<?> rejectVenueManager(@PathVariable Long managerId,
-                                                 @AuthMember Long adminMemberId) {
+    public ResponseEntity<ApiResponse<Void>> rejectVenueManager(@PathVariable Long managerId,
+                                                                  @AuthMember Long adminMemberId) {
         venueManagerService.rejectVenueManager(managerId, adminMemberId);
-        return ResponseEntity.ok(Map.of("message", "공연장 담당자가 반려되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("공연장 담당자가 반려되었습니다."));
     }
 
     // ─────────────────────────────────────────────
@@ -194,45 +268,44 @@ public class BackofficeSuperController {
 
     @GetMapping("/api/performances")
     @ResponseBody
-    public ResponseEntity<?> listPerformances(
-            @RequestParam(required = false) String approvalStatus,
-            @RequestParam(defaultValue = "1") int page) {
-        List<Performance> list  = performanceApprovalService.findAll(approvalStatus, page, 20);
-        int               total = performanceApprovalService.countAll(approvalStatus);
-        return ResponseEntity.ok(Map.of("list", list, "total", total, "page", page));
+    public ResponseEntity<ApiResponse<PageResponse<PerformanceSummaryDto>>> listPerformances(
+            @Valid @ModelAttribute PerformanceSearchQuery query) {
+        return ResponseEntity.ok(ApiResponse.success(performanceApprovalService.searchPerformances(query)));
     }
 
     @PostMapping("/api/performances/{performanceId}/approve")
     @ResponseBody
-    public ResponseEntity<?> approvePerformance(@PathVariable Long performanceId,
-                                                 @RequestBody(required = false) Map<String, String> body,
-                                                 @AuthMember Long adminMemberId) {
-        String note = body != null ? body.getOrDefault("note", "") : "";
+    public ResponseEntity<ApiResponse<Void>> approvePerformance(
+            @PathVariable Long performanceId,
+            @Valid @RequestBody(required = false) PerformanceReviewCommand command,
+            @AuthMember Long adminMemberId) {
+        String note = command != null ? command.getNote() : null;
         performanceApprovalService.approve(performanceId, adminMemberId, note);
-        return ResponseEntity.ok(Map.of("message", "공연이 승인되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("공연이 승인되었습니다."));
     }
 
     @PostMapping("/api/performances/{performanceId}/reject")
     @ResponseBody
-    public ResponseEntity<?> rejectPerformance(@PathVariable Long performanceId,
-                                                @RequestBody Map<String, String> body,
-                                                @AuthMember Long adminMemberId) {
-        performanceApprovalService.reject(performanceId, adminMemberId, body.getOrDefault("note", ""));
-        return ResponseEntity.ok(Map.of("message", "공연이 반려되었습니다."));
+    public ResponseEntity<ApiResponse<Void>> rejectPerformance(
+            @PathVariable Long performanceId,
+            @Valid @RequestBody PerformanceReviewCommand command,
+            @AuthMember Long adminMemberId) {
+        performanceApprovalService.reject(performanceId, adminMemberId, command.getNote());
+        return ResponseEntity.ok(ApiResponse.successMessage("공연이 반려되었습니다."));
     }
 
     @PostMapping("/api/performances/{performanceId}/publish")
     @ResponseBody
-    public ResponseEntity<?> publishPerformance(@PathVariable Long performanceId) {
+    public ResponseEntity<ApiResponse<Void>> publishPerformance(@PathVariable Long performanceId) {
         performanceApprovalService.publish(performanceId);
-        return ResponseEntity.ok(Map.of("message", "공연이 게시(ON_SALE)되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("공연이 게시(ON_SALE)되었습니다."));
     }
 
     @PostMapping("/api/performances/{performanceId}/rollback-to-draft")
     @ResponseBody
-    public ResponseEntity<?> rollbackToDraft(@PathVariable Long performanceId) {
+    public ResponseEntity<ApiResponse<Void>> rollbackToDraft(@PathVariable Long performanceId) {
         performanceApprovalService.rollbackToDraft(performanceId);
-        return ResponseEntity.ok(Map.of("message", "공연이 DRAFT로 롤백되었습니다."));
+        return ResponseEntity.ok(ApiResponse.successMessage("공연이 DRAFT로 롤백되었습니다."));
     }
 
     // ─────────────────────────────────────────────
@@ -304,33 +377,31 @@ public class BackofficeSuperController {
     @GetMapping("/api/venues/{venueId}/stage-configs")
     @ResponseBody
     public ResponseEntity<?> getStageConfigs(@PathVariable Long venueId) {
-        return ResponseEntity.ok(venueStageConfigMapper.findByVenueId(venueId));
+        return ResponseEntity.ok(venueAdminService.findStageConfigs(venueId));
     }
 
     @PostMapping("/api/venues/{venueId}/stage-configs")
     @ResponseBody
     public ResponseEntity<?> createStageConfig(@PathVariable Long venueId,
                                                 @RequestBody Map<String, Object> body) {
-        VenueStageConfig config = new VenueStageConfig();
-        config.setVenueId(venueId);
-        config.setConfigName((String) body.get("configName"));
-        config.setDescription((String) body.getOrDefault("description", ""));
-        config.setDefaultConfig(Boolean.TRUE.equals(body.get("isDefault")));
-        venueStageConfigMapper.insert(config);
+        String configName   = (String) body.get("configName");
+        String description  = (String) body.getOrDefault("description", "");
+        boolean isDefault   = Boolean.TRUE.equals(body.get("isDefault"));
+        VenueStageConfig config = venueAdminService.createStageConfig(venueId, configName, description, isDefault);
         return ResponseEntity.ok(Map.of("configId", config.getConfigId(), "message", "무대구성이 등록되었습니다."));
     }
 
     @DeleteMapping("/api/venues/{venueId}/stage-configs/{configId}")
     @ResponseBody
     public ResponseEntity<?> deleteStageConfig(@PathVariable Long venueId, @PathVariable Long configId) {
-        venueStageConfigMapper.deleteById(configId);
+        venueAdminService.deleteStageConfig(configId);
         return ResponseEntity.ok(Map.of("message", "무대구성이 삭제되었습니다."));
     }
 
     @GetMapping("/api/stage-configs/{configId}/sections")
     @ResponseBody
     public ResponseEntity<?> getStageSections(@PathVariable Long configId) {
-        return ResponseEntity.ok(venueStageSectionMapper.findByConfigId(configId));
+        return ResponseEntity.ok(venueAdminService.findStageSections(configId));
     }
 
     @PostMapping("/api/stage-configs/{configId}/sections")
@@ -343,7 +414,7 @@ public class BackofficeSuperController {
         ss.setActive(!Boolean.FALSE.equals(body.get("isActive")));
         ss.setCustomRows(body.get("customRows") != null ? ((Number) body.get("customRows")).intValue() : null);
         ss.setCustomSeatsPerRow(body.get("customSeatsPerRow") != null ? ((Number) body.get("customSeatsPerRow")).intValue() : null);
-        venueStageSectionMapper.upsert(ss);
+        venueAdminService.upsertStageSection(ss);
         return ResponseEntity.ok(Map.of("message", "저장되었습니다."));
     }
 
@@ -354,18 +425,17 @@ public class BackofficeSuperController {
     @GetMapping("/api/performances/{performanceId}/schedules")
     @ResponseBody
     public ResponseEntity<?> getSchedules(@PathVariable Long performanceId) {
-        return ResponseEntity.ok(scheduleMapper.findByPerformanceId(performanceId));
+        return ResponseEntity.ok(adminPerformanceService.findSchedulesByPerformanceId(performanceId));
     }
 
     @PostMapping("/api/performances/{performanceId}/schedules")
     @ResponseBody
     public ResponseEntity<?> createSchedule(@PathVariable Long performanceId,
                                              @RequestBody Map<String, Object> body) {
-        Schedule s = new Schedule();
-        s.setPerformanceId(performanceId);
-        s.setShowDate(LocalDate.parse((String) body.get("showDate")));
-        s.setShowTime(LocalTime.parse((String) body.get("showTime")));
-        scheduleMapper.insert(s);
+        Schedule s = adminPerformanceService.createSchedule(
+                performanceId,
+                LocalDate.parse((String) body.get("showDate")),
+                LocalTime.parse((String) body.get("showTime")));
         return ResponseEntity.ok(Map.of("scheduleId", s.getScheduleId(), "message", "회차가 등록되었습니다."));
     }
 
@@ -410,7 +480,7 @@ public class BackofficeSuperController {
     @GetMapping("/api/performances/{performanceId}/section-overrides")
     @ResponseBody
     public ResponseEntity<?> getSectionOverrides(@PathVariable Long performanceId) {
-        return ResponseEntity.ok(performanceSectionOverrideMapper.findByPerformanceId(performanceId));
+        return ResponseEntity.ok(adminPerformanceService.findSectionOverrides(performanceId));
     }
 
     @PostMapping("/api/performances/{performanceId}/section-overrides")
@@ -418,7 +488,6 @@ public class BackofficeSuperController {
     public ResponseEntity<?> upsertSectionOverride(@PathVariable Long performanceId,
                                                     @RequestBody Map<String, Object> body) {
         PerformanceSectionOverride override = new PerformanceSectionOverride();
-        override.setPerformanceId(performanceId);
         override.setSectionId(((Number) body.get("sectionId")).longValue());
         override.setActive(!Boolean.FALSE.equals(body.get("isActive")));
         override.setCustomRows(body.get("customRows") != null ? ((Number) body.get("customRows")).intValue() : null);
@@ -441,13 +510,13 @@ public class BackofficeSuperController {
     }
 
     // ─────────────────────────────────────────────
-    // 정산 관리 페이지
+    // 정산 관리
     // ─────────────────────────────────────────────
 
     @GetMapping("/settlement")
     public String settlementPage(Model model) {
-        model.addAttribute("promoters", promoterService.findByStatus("APPROVED", 1, 100));
-        model.addAttribute("defaultYearMonth", java.time.YearMonth.now().toString());
+        model.addAttribute("promoters", promoterService.findApprovedSummaries());
+        model.addAttribute("defaultYearMonth", portalDashboardService.defaultYearMonth());
         return "backoffice/super/settlement";
     }
 
@@ -456,31 +525,6 @@ public class BackofficeSuperController {
     public ResponseEntity<?> listSettlements(
             @RequestParam(required = false) Long promoterId,
             @RequestParam(required = false) String yearMonth) {
-        String ym = (yearMonth != null && !yearMonth.isBlank()) ? yearMonth : YearMonth.now().toString();
-        List<Map<String, Object>> rows = portalQueryMapper.findSettlementRows(promoterId, ym);
-        // 합계 계산
-        long totalGross     = rows.stream().mapToLong(r -> toLong(r.get("gross_sales"))).sum();
-        long totalFee       = rows.stream().mapToLong(r -> toLong(r.get("platform_fee"))).sum();
-        long totalPayable   = rows.stream().mapToLong(r -> toLong(r.get("payable_amount"))).sum();
-        int  totalResvCount = rows.stream().mapToInt(r -> toInt(r.get("confirmed_reservations"))).sum();
-        return ResponseEntity.ok(Map.of(
-            "rows",        rows,
-            "yearMonth",   ym,
-            "totalGross",  totalGross,
-            "totalFee",    totalFee,
-            "totalPayable",totalPayable,
-            "totalRsvCount", totalResvCount
-        ));
-    }
-
-    private static long toLong(Object v) {
-        if (v == null) return 0L;
-        if (v instanceof Number) return ((Number) v).longValue();
-        try { return Long.parseLong(v.toString()); } catch (Exception e) { return 0L; }
-    }
-    private static int toInt(Object v) {
-        if (v == null) return 0;
-        if (v instanceof Number) return ((Number) v).intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return 0; }
+        return ResponseEntity.ok(portalDashboardService.getSettlementSummary(promoterId, yearMonth));
     }
 }

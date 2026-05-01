@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.MemberSanctionMapper">
+
+    <insert id="insert" parameterType="MemberSanction">
+        INSERT INTO member_sanction (member_id, sanction_type, reason, sanctioned_by)
+        VALUES (#{memberId}, #{sanctionType}, #{reason}, #{sanctionedBy})
+    </insert>
+
+    <select id="findByMemberId" resultType="MemberSanction">
+        SELECT * FROM member_sanction
+        WHERE member_id = #{memberId}
+        ORDER BY sanctioned_at DESC
+    </select>
+
+</mapper>

@@ -18,6 +18,11 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/common.css" />
+
+    <!-- jQuery + Bootstrap JS — content의 inline script보다 먼저 로드되어야 함 -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="${pageContext.request.contextPath}/resources/js/common.js"></script>
 </head>
 <body>
     <tiles:insertAttribute name="header" />
@@ -27,10 +32,5 @@
     </main>
 
     <tiles:insertAttribute name="footer" />
-
-    <!-- jQuery + Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="${pageContext.request.contextPath}/resources/js/common.js"></script>
 </body>
 </html>

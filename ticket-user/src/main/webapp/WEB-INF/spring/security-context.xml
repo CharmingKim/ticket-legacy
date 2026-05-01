@@ -24,10 +24,9 @@
         <security:intercept-url pattern="/"                      access="permitAll" />
         <security:intercept-url pattern="/member/login"          access="permitAll" />
         <security:intercept-url pattern="/member/join"           access="permitAll" />
-        <security:intercept-url pattern="/member/join/**"        access="permitAll" />
-        <security:intercept-url pattern="/member/api/login"      access="permitAll" />
-        <security:intercept-url pattern="/member/api/join"       access="permitAll" />
-        <security:intercept-url pattern="/member/api/logout"     access="permitAll" />
+        <security:intercept-url pattern="/api/member/login"      access="permitAll" />
+        <security:intercept-url pattern="/api/member/join"       access="permitAll" />
+        <security:intercept-url pattern="/api/member/logout"     access="permitAll" />
         <security:intercept-url pattern="/performance/list"      access="permitAll" />
         <security:intercept-url pattern="/performance/detail/**" access="permitAll" />
         <security:intercept-url pattern="/api/performances/**"   access="permitAll" />

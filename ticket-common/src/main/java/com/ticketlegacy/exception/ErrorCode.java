@@ -19,18 +19,24 @@ public enum ErrorCode {
     PERFORMANCE_NOT_EDITABLE("PERF_003", "수정할 수 없는 상태의 공연입니다. (DRAFT 상태만 수정 가능)", 400),
     PERFORMANCE_APPROVAL_INVALID("PERF_004", "잘못된 승인 상태 전환입니다.", 400),
     PERFORMANCE_FORBIDDEN("PERF_005", "해당 공연에 대한 접근 권한이 없습니다.", 403),
+    PERFORMANCE_STATUS_INVALID_TRANSITION("PERF_006", "허용되지 않는 공연 상태 전환입니다.", 400),
     // 회원
     MEMBER_NOT_FOUND("MBR_001", "회원을 찾을 수 없습니다.", 404),
+    MEMBER_STATUS_INVALID_TRANSITION("MBR_002", "허용되지 않는 상태 전환입니다.", 400),
+    MEMBER_ALREADY_WITHDRAWN("MBR_003", "이미 탈퇴한 회원입니다.", 409),
+    MEMBER_CANNOT_MODIFY_SELF("MBR_004", "본인 계정의 상태는 변경할 수 없습니다.", 403),
     // 기획사
     PROMOTER_NOT_FOUND("PRO_001", "기획사를 찾을 수 없습니다.", 404),
     PROMOTER_NOT_APPROVED("PRO_002", "승인되지 않은 기획사 계정입니다.", 403),
     PROMOTER_ALREADY_REGISTERED("PRO_003", "이미 등록된 기획사입니다.", 409),
     PROMOTER_SUSPENDED("PRO_004", "정지된 기획사 계정입니다.", 403),
+    PROMOTER_STATUS_INVALID_TRANSITION("PRO_005", "허용되지 않는 기획사 상태 전환입니다.", 400),
     // 공연장 담당자
     VENUE_MANAGER_NOT_FOUND("VM_001", "공연장 담당자 정보를 찾을 수 없습니다.", 404),
     VENUE_MANAGER_NOT_APPROVED("VM_002", "승인되지 않은 공연장 담당자 계정입니다.", 403),
     VENUE_MANAGER_FORBIDDEN("VM_003", "담당하지 않는 공연장입니다.", 403),
     SECTION_IN_USE("VM_004", "공연에 사용 중인 구역은 삭제할 수 없습니다.", 409),
+    VENUE_MANAGER_STATUS_INVALID_TRANSITION("VM_005", "허용되지 않는 공연장 담당자 상태 전환입니다.", 400),
     // 예약
     RESERVATION_NOT_FOUND("RSV_001", "예약을 찾을 수 없습니다.", 404),
     RESERVATION_CANCEL_FAILED("RSV_002", "예약 취소에 실패했습니다.", 400),

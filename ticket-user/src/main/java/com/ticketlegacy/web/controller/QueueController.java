@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.Map;
 
 @Controller
 public class QueueController {
@@ -23,8 +24,9 @@ public class QueueController {
 
     @PostMapping("/api/queue/enter")
     @ResponseBody
-    public ApiResponse<QueuePositionResponse> enter(@RequestParam Long scheduleId,
+    public ApiResponse<QueuePositionResponse> enter(@RequestBody Map<String, Object> body,
                                                      HttpServletRequest request) {
+        Long scheduleId = ((Number) body.get("scheduleId")).longValue();
         Long memberId = (Long) request.getAttribute("loginMemberId");
         return ApiResponse.success(queueService.enterQueue(scheduleId, memberId));
     }

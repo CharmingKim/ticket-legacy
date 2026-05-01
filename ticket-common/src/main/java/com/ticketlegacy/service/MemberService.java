@@ -1,13 +1,23 @@
 package com.ticketlegacy.service;
 
 import com.ticketlegacy.domain.Member;
+import com.ticketlegacy.domain.MemberSanction;
+import com.ticketlegacy.domain.MemberStatusHistory;
 import com.ticketlegacy.domain.Promoter;
 import com.ticketlegacy.domain.VenueManager;
+import com.ticketlegacy.domain.enums.MemberStatus;
+import com.ticketlegacy.dto.request.MemberSearchQuery;
+import com.ticketlegacy.dto.response.MemberSummaryDto;
+import com.ticketlegacy.dto.response.PageResponse;
+import java.util.List;
+import java.util.stream.Collectors;
 import com.ticketlegacy.dto.request.LoginRequest;
 import com.ticketlegacy.dto.request.MemberJoinRequest;
 import com.ticketlegacy.exception.BusinessException;
 import com.ticketlegacy.exception.ErrorCode;
 import com.ticketlegacy.repository.MemberMapper;
+import com.ticketlegacy.repository.MemberSanctionMapper;
+import com.ticketlegacy.repository.MemberStatusHistoryMapper;
 import com.ticketlegacy.repository.PromoterMapper;
 import com.ticketlegacy.repository.VenueManagerMapper;
 import com.ticketlegacy.util.JwtUtil;
@@ -21,11 +31,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MemberService {
 
-    @Autowired private MemberMapper         memberMapper;
-    @Autowired private PromoterMapper       promoterMapper;
-    @Autowired private VenueManagerMapper   venueManagerMapper;
-    @Autowired private BCryptPasswordEncoder passwordEncoder;
-    @Autowired private JwtUtil              jwtUtil;
+    @Autowired private MemberMapper              memberMapper;
+    @Autowired private MemberStatusHistoryMapper historyMapper;
+    @Autowired private MemberSanctionMapper      sanctionMapper;
+    @Autowired private PromoterMapper            promoterMapper;
+    @Autowired private VenueManagerMapper        venueManagerMapper;
+    @Autowired private BCryptPasswordEncoder     passwordEncoder;
+    @Autowired private JwtUtil                   jwtUtil;
 
     // ──────────────────────────────────────────
     // 일반 회원가입
@@ -114,6 +126,102 @@ public class MemberService {
         Member m = memberMapper.findById(memberId);
         if (m == null) throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         return m;
+    }
+
+    // ──────────────────────────────────────────
+    // 관리자 전용 — 회원 조회 / 상태 변경
+    // ──────────────────────────────────────────
+
+    /** 페이지 검색 — 비밀번호 없는 DTO 반환 */
+    public PageResponse<MemberSummaryDto> searchMembers(MemberSearchQuery query) {
+        List<Member> members = memberMapper.findAll(
+                query.getRole(), query.getStatus(), query.getKeyword(),
+                query.getOffset(), query.getSize());
+        int total = memberMapper.countFiltered(query.getRole(), query.getStatus(), query.getKeyword());
+        List<MemberSummaryDto> dtos = members.stream()
+                .map(MemberSummaryDto::from)
+                .collect(Collectors.toList());
+        return PageResponse.of(dtos, total, query.getPage(), query.getSize());
+    }
+
+    /** @deprecated 컨트롤러에서 직접 호출 금지. searchMembers(MemberSearchQuery) 사용. */
+    @Deprecated
+    public List<Member> findAll(String role, String status, String keyword, int page, int pageSize) {
+        return memberMapper.findAll(role, status, keyword, (page - 1) * pageSize, pageSize);
+    }
+
+    /** @deprecated 컨트롤러에서 직접 호출 금지. searchMembers(MemberSearchQuery) 사용. */
+    @Deprecated
+    public int countFiltered(String role, String status, String keyword) {
+        return memberMapper.countFiltered(role, status, keyword);
+    }
+
+    /**
+     * FSM 기반 상태 전환 — 허용되지 않는 전환은 BusinessException.
+     * 모든 전환은 member_status_history에 자동 기록.
+     * SUSPENDED/WITHDRAWN 전환 시 member_sanction에도 사유 기록.
+     */
+    @Transactional
+    public void updateAdminStatus(Long memberId, MemberStatus newStatus, Long adminMemberId, String reason) {
+        Member m = memberMapper.findById(memberId);
+        if (m == null) throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+
+        MemberStatus current;
+        try {
+            current = MemberStatus.valueOf(m.getStatus());
+        } catch (IllegalArgumentException e) {
+            log.warn("알 수 없는 현재 상태값 '{}' — 강제 전환 허용: memberId={}", m.getStatus(), memberId);
+            memberMapper.updateStatus(memberId, newStatus.name());
+            return;
+        }
+
+        if (current == MemberStatus.WITHDRAWN) {
+            throw new BusinessException(ErrorCode.MEMBER_ALREADY_WITHDRAWN);
+        }
+        if (!current.canTransitionTo(newStatus)) {
+            throw new BusinessException(ErrorCode.MEMBER_STATUS_INVALID_TRANSITION,
+                    current.name() + " → " + newStatus.name());
+        }
+
+        memberMapper.updateStatus(memberId, newStatus.name());
+
+        MemberStatusHistory history = new MemberStatusHistory();
+        history.setMemberId(memberId);
+        history.setFromStatus(current.name());
+        history.setToStatus(newStatus.name());
+        history.setChangedBy(adminMemberId);
+        history.setReason(reason);
+        historyMapper.insert(history);
+
+        if (newStatus == MemberStatus.SUSPENDED || newStatus == MemberStatus.WITHDRAWN) {
+            MemberSanction sanction = new MemberSanction();
+            sanction.setMemberId(memberId);
+            sanction.setSanctionType(newStatus.name());
+            sanction.setReason(reason != null ? reason : "(사유 미입력)");
+            sanction.setSanctionedBy(adminMemberId != null ? adminMemberId : 0L);
+            sanctionMapper.insert(sanction);
+        }
+
+        log.info("어드민 회원 상태 변경: memberId={}, {} → {}, adminId={}", memberId, current, newStatus, adminMemberId);
+    }
+
+    /** 이전 호환용 — adminMemberId/reason 없는 호출. */
+    @Transactional
+    public void updateAdminStatus(Long memberId, MemberStatus newStatus) {
+        updateAdminStatus(memberId, newStatus, null, null);
+    }
+
+    /** String 오버로드 — 이전 호환용. */
+    @Transactional
+    public void updateAdminStatus(Long memberId, String status) {
+        MemberStatus newStatus;
+        try {
+            newStatus = MemberStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.MEMBER_STATUS_INVALID_TRANSITION,
+                    "'" + status + "'은 유효한 상태값이 아닙니다.");
+        }
+        updateAdminStatus(memberId, newStatus, null, null);
     }
 
     // ──────────────────────────────────────────

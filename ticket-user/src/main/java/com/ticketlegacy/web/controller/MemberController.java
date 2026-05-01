@@ -56,7 +56,7 @@ public class MemberController {
                                                   HttpServletResponse response) {
         MemberService.LoginResult result = memberService.login(request);
 
-        Cookie cookie = new Cookie("ACCESS_TOKEN", result.token);
+        Cookie cookie = new Cookie("USER_TOKEN", result.token);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60 * 2);
@@ -74,7 +74,7 @@ public class MemberController {
     @PostMapping("/api/member/logout")
     @ResponseBody
     public ApiResponse<String> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie("ACCESS_TOKEN", null);
+        Cookie cookie = new Cookie("USER_TOKEN", null);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge(0);

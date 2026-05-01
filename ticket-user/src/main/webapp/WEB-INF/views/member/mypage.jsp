@@ -81,7 +81,7 @@
                                         </div>
                                     </div>
                                     <div class="tl-coupon-discount">
-                                        <fmt:formatNumber value="${c.discountAmount}" type="number" />원 할인
+                                        ${c.discountText} 할인
                                     </div>
                                 </div>
                             </c:forEach>

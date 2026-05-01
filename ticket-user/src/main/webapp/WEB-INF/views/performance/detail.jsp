@@ -122,6 +122,12 @@
                                             </div>
                                         </div>
                                         <c:choose>
+                                            <c:when test="${performance.status == 'UPCOMING'}">
+                                                <span class="tl-schedule-avail avail-soon">오픈 예정</span>
+                                            </c:when>
+                                            <c:when test="${performance.status == 'ENDED' || s.status == 'ENDED'}">
+                                                <span class="tl-schedule-avail avail-end">공연 종료</span>
+                                            </c:when>
                                             <c:when test="${s.availableSeats > 20}">
                                                 <span class="tl-schedule-avail avail-ok">여유 있음</span>
                                             </c:when>
@@ -155,8 +161,9 @@ $(function() {
 
     $('.tl-schedule-item').on('click', function() {
         const $this = $(this);
-        const avail = $this.find('.avail-none');
-        if (avail.length) { toast.warning('매진된 일정입니다.'); return; }
+        if ($this.find('.avail-none').length) { toast.warning('매진된 일정입니다.'); return; }
+        if ($this.find('.avail-soon').length) { toast.warning('아직 예매 오픈 전입니다.'); return; }
+        if ($this.find('.avail-end').length)  { toast.warning('종료된 공연입니다.'); return; }
 
         $('.tl-schedule-item').removeClass('selected');
         $this.addClass('selected');

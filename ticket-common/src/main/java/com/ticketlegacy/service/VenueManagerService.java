@@ -2,6 +2,11 @@ package com.ticketlegacy.service;
 
 import com.ticketlegacy.domain.Member;
 import com.ticketlegacy.domain.VenueManager;
+import com.ticketlegacy.domain.enums.VenueManagerApprovalStatus;
+import com.ticketlegacy.dto.request.RegisterVenueManagerCommand;
+import com.ticketlegacy.dto.request.VenueManagerSearchQuery;
+import com.ticketlegacy.dto.response.PageResponse;
+import com.ticketlegacy.dto.response.VenueManagerSummaryDto;
 import com.ticketlegacy.exception.BusinessException;
 import com.ticketlegacy.exception.ErrorCode;
 import com.ticketlegacy.repository.MemberMapper;
@@ -13,48 +18,45 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class VenueManagerService {
 
-    private final VenueManagerMapper    venueManagerMapper;
-    private final MemberMapper          memberMapper;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final VenueManagerMapper     venueManagerMapper;
+    private final MemberMapper           memberMapper;
+    private final BCryptPasswordEncoder  passwordEncoder;
 
     // ──────────────────────────────────────────
     // 공연장 담당자 가입 신청
     // ──────────────────────────────────────────
 
     @Transactional
-    public void registerVenueManager(Map<String, Object> body) {
-        String email   = (String) body.get("email");
-        Long   venueId = ((Number) body.get("venueId")).longValue();
-
-        if (memberMapper.existsByEmail(email) > 0) {
+    public void registerVenueManager(RegisterVenueManagerCommand command) {
+        if (memberMapper.existsByEmail(command.getEmail()) > 0) {
             throw new BusinessException(ErrorCode.AUTH_EMAIL_DUPLICATE);
         }
 
         Member member = new Member();
-        member.setEmail(email);
-        member.setPassword(passwordEncoder.encode((String) body.get("password")));
-        member.setName((String) body.get("name"));
-        member.setPhone((String) body.get("phone"));
+        member.setEmail(command.getEmail());
+        member.setPassword(passwordEncoder.encode(command.getPassword()));
+        member.setName(command.getName());
+        member.setPhone(command.getPhone());
         member.setRole("VENUE_MANAGER");
         member.setStatus("PENDING_APPROVAL");
         memberMapper.insert(member);
 
         VenueManager vm = new VenueManager();
         vm.setMemberId(member.getMemberId());
-        vm.setVenueId(venueId);
-        vm.setDepartment((String) body.get("department"));
-        vm.setPosition((String) body.get("position"));
-        vm.setApprovalStatus("PENDING");
+        vm.setVenueId(command.getVenueId());
+        vm.setDepartment(command.getDepartment());
+        vm.setPosition(command.getPosition());
+        vm.setApprovalStatus(VenueManagerApprovalStatus.PENDING.name());
         venueManagerMapper.insert(vm);
 
-        log.info("공연장 담당자 가입 신청: email={}, venueId={}", email, venueId);
+        log.info("공연장 담당자 가입 신청: email={}, venueId={}", command.getEmail(), command.getVenueId());
     }
 
     // ──────────────────────────────────────────
@@ -64,42 +66,58 @@ public class VenueManagerService {
     @Transactional
     public void approveVenueManager(Long managerId, Long adminMemberId) {
         VenueManager vm = getOrThrow(managerId);
-        if (!"PENDING".equals(vm.getApprovalStatus())) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "승인 대기 상태만 승인 가능합니다.");
-        }
-        venueManagerMapper.updateApproval(managerId, "APPROVED", adminMemberId);
+        VenueManagerApprovalStatus current = parseStatus(vm.getApprovalStatus());
+        validateTransition(current, VenueManagerApprovalStatus.APPROVED);
+
+        venueManagerMapper.updateApproval(managerId, VenueManagerApprovalStatus.APPROVED.name(), adminMemberId);
         memberMapper.updateStatus(vm.getMemberId(), "ACTIVE");
-        log.info("공연장 담당자 승인: managerId={}", managerId);
+        log.info("공연장 담당자 승인: managerId={}, {} → APPROVED", managerId, current);
     }
 
     @Transactional
     public void rejectVenueManager(Long managerId, Long adminMemberId) {
         VenueManager vm = getOrThrow(managerId);
-        venueManagerMapper.updateApproval(managerId, "REJECTED", adminMemberId);
+        VenueManagerApprovalStatus current = parseStatus(vm.getApprovalStatus());
+        validateTransition(current, VenueManagerApprovalStatus.REJECTED);
+
+        venueManagerMapper.updateApproval(managerId, VenueManagerApprovalStatus.REJECTED.name(), adminMemberId);
         memberMapper.updateStatus(vm.getMemberId(), "DORMANT");
-        log.info("공연장 담당자 반려: managerId={}", managerId);
+        log.info("공연장 담당자 반려: managerId={}, {} → REJECTED", managerId, current);
     }
 
     // ──────────────────────────────────────────
-    // 조회 / 검증
+    // 조회 (typed API)
     // ──────────────────────────────────────────
 
-    public List<VenueManager> findByStatus(String status, int page, int size) {
-        int offset = (page - 1) * size;
-        return venueManagerMapper.findByStatus(status, offset, size);
+    public PageResponse<VenueManagerSummaryDto> searchVenueManagers(VenueManagerSearchQuery query) {
+        String status = (query.getStatus() == null || query.getStatus().isBlank()) ? null : query.getStatus();
+        List<VenueManager> rows;
+        int total;
+        if (status == null) {
+            rows  = venueManagerMapper.findAll(query.getOffset(), query.getSize());
+            total = venueManagerMapper.countAll();
+        } else {
+            rows  = venueManagerMapper.findByStatus(status, query.getOffset(), query.getSize());
+            total = venueManagerMapper.countByStatus(status);
+        }
+        List<VenueManagerSummaryDto> content = rows.stream()
+                .map(VenueManagerSummaryDto::from)
+                .collect(Collectors.toList());
+        return PageResponse.of(content, total, query.getPage(), query.getSize());
     }
 
     public int countByStatus(String status) {
         return venueManagerMapper.countByStatus(status);
     }
 
-    /**
-     * memberId로 담당 venueId 반환 (APPROVED 상태만).
-     */
+    // ──────────────────────────────────────────
+    // 검증 (Partner 포털에서 사용 — 변경 없음)
+    // ──────────────────────────────────────────
+
     public Long getVenueIdByMemberId(Long memberId) {
         VenueManager vm = venueManagerMapper.findByMemberId(memberId);
         if (vm == null) throw new BusinessException(ErrorCode.VENUE_MANAGER_NOT_FOUND);
-        if (!"APPROVED".equals(vm.getApprovalStatus())) {
+        if (!VenueManagerApprovalStatus.APPROVED.name().equals(vm.getApprovalStatus())) {
             throw new BusinessException(ErrorCode.VENUE_MANAGER_NOT_APPROVED);
         }
         return vm.getVenueId();
@@ -111,9 +129,6 @@ public class VenueManagerService {
         return vm;
     }
 
-    /**
-     * memberId가 해당 venueId의 담당자인지 검증.
-     */
     public void verifyVenueOwnership(Long memberId, Long venueId) {
         Long myVenueId = getVenueIdByMemberId(memberId);
         if (!myVenueId.equals(venueId)) {
@@ -121,20 +136,28 @@ public class VenueManagerService {
         }
     }
 
-    /**
-     * 섹션이 공연 좌석에 사용 중이면 예외 발생.
-     * (섹션 삭제 전 호출)
-     */
-    public void assertSectionNotInUse(Long sectionId) {
-        // seat 테이블에서 해당 섹션 사용 여부 확인은 현재 구조상
-        // seatMapper.findByPerformanceId 로 직접 확인하기 어려우므로
-        // VenueAdminService.deleteSection 내부에서 처리하도록 위임
-        // 추후 SeatMapper에 countBySectionId 추가 시 여기서 직접 처리
-    }
+    // ──────────────────────────────────────────
+    // internal
+    // ──────────────────────────────────────────
 
     private VenueManager getOrThrow(Long managerId) {
         VenueManager vm = venueManagerMapper.findById(managerId);
         if (vm == null) throw new BusinessException(ErrorCode.VENUE_MANAGER_NOT_FOUND);
         return vm;
+    }
+
+    private VenueManagerApprovalStatus parseStatus(String raw) {
+        try {
+            return VenueManagerApprovalStatus.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "알 수 없는 공연장 담당자 상태: " + raw);
+        }
+    }
+
+    private void validateTransition(VenueManagerApprovalStatus current, VenueManagerApprovalStatus next) {
+        if (!current.canTransitionTo(next)) {
+            throw new BusinessException(ErrorCode.VENUE_MANAGER_STATUS_INVALID_TRANSITION,
+                    current.name() + " → " + next.name());
+        }
     }
 }

@@ -1,362 +1,483 @@
 # TicketLegacy — 인수인계 문서
 
-> 작성 기준일: 2026-04-17  
-> 작성 목적: 이후 세션(Opus 등 다른 모델)이 컨텍스트 없이도 즉시 작업을 이어갈 수 있도록 현재 상태, 완료 작업, 미해결 이슈, 확장 방향을 상세히 기술
+> 최신 업데이트: 2026-05-01 (10차 세션 — Phase A 테스트 2항목 통과, 회원 상태 드롭다운 FSM 적용)
+> 목적: 다음 세션이 현재 상태·미해결 이슈·실행 절차를 빠르게 파악
+
+## 🎯 작업 자세 (Claude 가 코드 짤 때의 마인드셋)
+
+**대기업 시니어 개발자처럼 개발한다.** 토이 포트폴리오 수준이 아니라 실제 운영되는 엔터프라이즈 서비스 기준으로:
+
+- 컨벤션을 무비판적으로 따르지 말 것 — 기존 패턴이 어색하면 짚고 개선안 제시 (예: 화면 데이터를 `model.addAttribute` 6개로 흩뿌리지 말고 ViewModel/PageDTO 로 응집)
+- 도메인-매퍼-JSP 정합성을 항상 의식 (필드명·타입·null 처리)
+- 트랜잭션 경계, 동시성, 멱등성, 보안(JWT/CSRF/XSS/SQLi) 을 모든 변경에서 점검
+- "동작하면 끝" 이 아니라 "운영에서 안 터지는가" 기준 — 데이터 0건/대량/경계값/장애 시나리오 고려
+- 변명·우회 금지. 하드코딩, mock, 임시 fetch 우회 등은 발견 즉시 HANDOVER §10 에 기록
+- 사용자가 묻기 전에 잠재 위험 (다음 단계에서 터질 가능성) 을 사전 경고
+
+이 원칙은 모든 파일 수정·리뷰·설계 결정에 적용된다.
 
 ---
 
-## 1. 프로젝트 개요
+## 🚀 다음 세션 시작 가이드 (여기부터 읽기)
 
-**TicketLegacy**는 공연 좌석 예매 시스템으로, 하나의 Maven 멀티모듈 프로젝트(`ticket-parent`) 안에 세 개의 독립 웹 애플리케이션이 구성되어 있다.
+**직전 세션(8차)에서 한 것**
+- **Phase A (인프라)**: MemberStatus FSM, ApiResponse 개선, PageResponse, GlobalExceptionHandler 3-WAR 동기화
+- **Phase B1 (Member 봉인)**: MemberSearchQuery/MemberStatusCommand/MemberSummaryDto + FSM validateTransition + 컨트롤러 완전 typed
 
-| 모듈 | 포트 | 대상 사용자 | 역할 |
+**직전 세션(9차)에서 한 것**
+- **Phase B2 (Promoter 봉인)**: PromoterApprovalStatus FSM enum, RegisterPromoterCommand, PromoterRejectCommand, PromoterSearchQuery, PromoterSummaryDto 신규 + PromoterService 완전 재작성 (typed + FSM) + 컨트롤러 완전 typed + dashboardPromoters/settlementPage DTO화
+
+**직전 세션(9차)에서도 한 것 (이어서)**
+- **Phase B3 (VenueManager 봉인)**: VenueManagerApprovalStatus FSM, RegisterVenueManagerCommand, VenueManagerSearchQuery, VenueManagerSummaryDto + VenueManagerMapper findAll/countAll 추가 + VenueManagerService 완전 재작성 + 컨트롤러 완전 typed
+
+**직전 세션(9차)에서도 한 것 (이어서)**
+- **Phase B4 (Performance 봉인)**: PerformanceApprovalStatus FSM enum, PerformanceReviewCommand, PerformanceSearchQuery, PerformanceSummaryDto + PerformanceApprovalService FSM 적용 + 컨트롤러 완전 typed + dashboard.js 응답 구조 수정(`list`→`data.content`)
+
+**직전 세션(10차)에서 한 것**
+- **Phase A 테스트 전항목 통과 (3/3) ✅ 완전 봉인**
+- **Phase B1 회원목록/검색/JSON보안/SUSPENDED·WITHDRAWN FSM 테스트 통과** — DORMANT 2개 항목만 잔여: `ApiResponse { success, message, data, errorCode }` 구조 확인 ✅ / `GlobalExceptionHandler` 잘못된 JSON → 400 확인 ✅ / 존재하지 않는 memberId 상태변경 → 404 `MBR_001` 확인 ✅ — **Phase A 완전 봉인**
+- **JSP EL 버그 수정** (`member-list.jsp`): JS 템플릿 리터럴 `${item.name}` 등을 JSP EL이 서버사이드에서 `"false"` 로 치환하는 문제 → 문자열 연결(`+`)로 전면 교체. `loadVenueOptions()` 동일 수정.
+- **회원 상태 드롭다운 FSM 적용** (`member-list.jsp`, `member-search.jsp`): 현재 상태 기반 유효 전환만 노출 (DORMANT 제거 — 시스템 자동 전환 전용), WITHDRAWN 시 SweetAlert 확인 다이얼로그 추가, WITHDRAWN 회원은 "변경 불가" 텍스트로 표시
+
+**다음 세션 시작 순서**
+1. **Phase A 나머지**: 존재하지 않는 회원 ID 상태변경 → 404 확인 (F12 Console fetch로 30초)
+2. **Phase B1 이어서 테스트**: 회원 목록 렌더링·검색·FSM 항목들
+3. **Phase 2 어드민 기능 완성** — 통계 NPE 방어, 회원 상세 조회 모달
+2. **Phase 3 파트너** — 좌석등급 설정 UI
+3. **Phase 4 유저** — 쿠폰 적용 UI, 공연 검색/필터
+
+**즉시 실행 체크리스트**
+```bash
+# 1. MySQL 8 기동 확인
+mysql -uroot -p1234 springgreen6 -e "SELECT 1"
+
+# 2. Redis 기동 확인 (ticket-user 필수)
+redis-cli ping    # → PONG
+
+# 3. 3개 WAR 기동 (각각 별도 터미널)
+mvn tomcat7:run -pl ticket-user    -am    # :8080
+mvn tomcat7:run -pl ticket-partner -am    # :8081
+mvn tomcat7:run -pl ticket-admin   -am    # :8082
+```
+
+---
+
+---
+
+## 1. 아키텍처 한 눈에
+
+Maven 멀티모듈 / 단일 DB(`springgreen6`) / 3-WAR.
+
+| 모듈 | 포트 | 역할 | 테스트 계정 (비번 `Cks159753!`) |
 |---|---|---|---|
-| `ticket-user` | 8080 | 일반 회원(MEMBER) | 공연 목록/상세, 좌석 선택, 결제, 예매 내역, 마이페이지 |
-| `ticket-partner` | 8081 | 기획사(PROMOTER), 공연장관리자(VENUE_MANAGER) | 공연 등록/관리, 공연장 운영, 입장 처리, 정산 조회 |
-| `ticket-admin` | 8082 | 슈퍼어드민(SUPER_ADMIN), 스태프(STAFF) | 회원/공연/정산/쿠폰/공지 전체 관리, 통계 |
-| `ticket-common` | (lib) | 공통 | 도메인, 서비스, 레포지토리, 유틸 등 공유 코드 |
+| `ticket-user` | 8080 | 일반 회원 (공연/좌석/결제) | `user1@test.com` (user2·3도 동일) |
+| `ticket-partner` | 8081 | 기획사, 공연장 담당 | `promoter1@test.com` (APPROVED) / `venue1@test.com` |
+| `ticket-admin` | 8082 | 슈퍼어드민, 스태프 | `admin@ticketlegacy.com` / `staff@ticketlegacy.com` |
+| `ticket-common` | (jar) | 도메인·서비스·매퍼 공유 | — |
 
-### 기술 스택
+> `promoter2@test.com` 은 PENDING 상태로 시드돼 있어 어드민 승인 플로우 검증용으로 사용.
 
-- **Backend**: Spring MVC 5.3, Spring Security 5.8, MyBatis 3.5
-- **DB**: MySQL 8 — 스키마 `springgreen6` (3개 포털 공유 단일 DB)
-- **캐시/락**: Redis (Lettuce) — 좌석 분산락, 대기열 관리
-- **뷰**: JSP + JSTL + Apache Tiles 3
-- **인증**: JWT (JJWT 0.11.5) — HttpOnly 쿠키, 2시간 만료
-- **빌드**: Maven, Java 11
-- **개발환경**: STS4 + Tomcat 9, `testEnvironment="true"` 격리 배포
+**핵심 제약**: Spring MVC 5.3 (Boot 아님), Java 11, `javax.*` 필수, MyBatis 3.5, JSP + Tiles 3, JJWT 0.11.5.
 
-### STS 배포 경로
+**인프라 선조건**
+- MySQL 8, 스키마 `springgreen6`, 계정 root/1234 (root-context.xml에 하드코딩)
+- Redis localhost:6379 — **ticket-user 필수**, admin/partner 미사용
+- 환경변수 `JWT_SECRET_KEY` (Base64) — 3개 WAR 동일 값
 
-```
-.metadata/.plugins/org.eclipse.wst.server.core/
-  tmp1/wtpwebapps/ticket-admin/   ← ticket-admin 배포
-  tmp2/wtpwebapps/ticket-partner/ ← ticket-partner 배포
-  tmp3/wtpwebapps/ticket-user/    ← ticket-user 배포
-```
+---
 
-**중요**: STS 설정이 "Never publish automatically"이므로 소스 변경 후 배포 폴더에도 직접 복사해야 한다. 프로젝트 루트의 `deploy-sync.sh` 스크립트로 일괄 처리:
+## 2. 실행
 
 ```bash
-bash deploy-sync.sh all        # 전체
-bash deploy-sync.sh user       # ticket-user만
-bash deploy-sync.sh partner    # ticket-partner만
-bash deploy-sync.sh admin      # ticket-admin만
+# 전체 빌드
+mvn clean package -pl ticket-common,ticket-user,ticket-partner,ticket-admin -am
+
+# 개별 실행 (각 터미널)
+mvn tomcat7:run -pl ticket-user -am
+mvn tomcat7:run -pl ticket-partner -am
+mvn tomcat7:run -pl ticket-admin -am
 ```
 
-Java 파일 변경 시에는 스크립트 후 반드시 **서버 Restart** 필요.
+**STS 사용 시**: Tomcat 9 + `testEnvironment="true"` 격리 배포. 소스 변경 후:
+```bash
+bash deploy-sync.sh [user|partner|admin|all]   # JSP/CSS/JS 즉시 반영
+# Java 변경 시 → 해당 서버 Restart 필수
+```
 
 ---
 
-## 2. 인증 및 역할 체계
+## 3. 인증·URL 매핑
 
-### 역할 구분
+### 로그인 API (전 포털 정규화 완료)
 
-| Role | 가입 방법 | 로그인 포털 | 접근 경로 |
+| 포털 | 로그인 | 회원가입 | 로그아웃 |
 |---|---|---|---|
-| `MEMBER` | `/member/join` 자가 가입 | ticket-user (8080) | `/`, `/performance/**`, `/reservation/**`, `/seat/**` |
-| `PROMOTER` | SUPER_ADMIN이 어드민에서 계정 생성 후 승인 | ticket-partner (8081) | `/partner/promoter/**` |
-| `VENUE_MANAGER` | SUPER_ADMIN이 어드민에서 계정 생성 후 승인 | ticket-partner (8081) | `/partner/venue/**` |
-| `STAFF` | SUPER_ADMIN이 직접 생성 | ticket-admin (8082) | `/backoffice/staff/**` |
-| `SUPER_ADMIN` | DB 시드 데이터로만 존재 | ticket-admin (8082) | `/backoffice/super/**`, `/backoffice/staff/**` |
+| user | `POST /api/member/login` | `POST /api/member/join` | `POST /api/member/logout` |
+| partner | `POST /partner/api/login` | 없음 (어드민이 생성) | `POST /partner/api/logout` |
+| admin | `POST /admin/api/login` | 없음 | `POST /admin/api/logout` |
 
-### JWT 흐름
+### 접근 제어
 
-1. 로그인 API → JWT 발급 → HttpOnly 쿠키(`ACCESS_TOKEN`)에 저장
-2. 모든 요청에서 `JwtAuthenticationFilter`가 쿠키 검증 → `SecurityContextHolder` 설정
-3. 각 포털의 로그인 API는 역할 검증 후 거부:
-   - `ticket-user` `/api/member/login` — 역할 무관 허용 (단, PROMOTER/VENUE_MANAGER 로그인 시 파트너 포털 URL로 redirectUrl 반환)
-   - `ticket-partner` `/partner/api/login` — PROMOTER, VENUE_MANAGER만 허용
-   - `ticket-admin` `/admin/api/login` — SUPER_ADMIN, STAFF만 허용
+- JWT HttpOnly 쿠키 · 2시간 만료 — 포털별 쿠키명: `USER_TOKEN` / `PARTNER_TOKEN` / `ADMIN_TOKEN`
+- `JwtAuthenticationFilter` — 쿠키 파싱 → SecurityContext 설정
+- 각 포털 `security-context.xml`에서 역할 기반 차단
+  - `/backoffice/super/**` → SUPER_ADMIN
+  - `/backoffice/staff/**` → SUPER_ADMIN + STAFF
+  - `/partner/promoter/**` → PROMOTER
+  - `/partner/venue/**` → VENUE_MANAGER
 
-### 테스트 계정 (DB 시드 기준)
+### 역할·가입 경로
 
-| 계정 | 역할 | 포털 |
+| Role | 생성 방법 |
+|---|---|
+| `MEMBER` | `/member/join` 자가 가입 |
+| `PROMOTER` / `VENUE_MANAGER` | SUPER_ADMIN이 어드민에서 생성 + 승인 |
+| `STAFF` | SUPER_ADMIN 직접 생성 |
+| `SUPER_ADMIN` | DB 시드 |
+
+---
+
+## 4. 3차 세션에서 추가된 내용 (2026-04-20, 3차)
+
+### DB 전체 스키마 + 시드 구축
+
+| 항목 | 파일 | 내용 |
 |---|---|---|
-| `user1@test.com` / `user123` | MEMBER | ticket-user |
-| `admin@ticketlegacy.com` / `admin123` | SUPER_ADMIN | ticket-admin |
+| **`db/init.sql` 신설** | `db/init.sql` | 21개 테이블 DDL + FK 순서 반영 시드. 재실행 안전 (DROP + 재생성). MySQL 8 에서 실제 실행 검증 완료. |
+| **시드 계정 8개** | `db/init.sql` (member INSERT) | SUPER_ADMIN · STAFF · USER×3 · PROMOTER×2(1 APPROVED, 1 PENDING) · VENUE_MANAGER. 공통 비번 `Cks159753!` (BCrypt `$2a$10$uXbsu3ZmwyTylFYvS/YVZuJ3BkeOTSW1wf2YQRxQH0yG9weU8v7MO`) |
+| **시드 공연 4건** | `db/init.sql` | PUBLISHED+ON_SALE×2 (IU·라이온킹) / REVIEW×1 (BTS) / APPROVED×1 (백조의 호수, publish 대기). 각 단계별 E2E 입력값 역할. |
+| **좌석/인벤토리 612행** | `db/init.sql` | venue_section 의 total_rows×seats_per_row 를 recursive CTE 로 전개 → seat_inventory 전부 AVAILABLE. 샘플 예매 1건(VIP A1·A2 RESERVED + payment COMPLETED) 포함. |
+| **섹션 5 E2E 절차 재작성** | `HANDOVER.md` | 시드 기반 D→C→A→B 순서로 단축. 각 단계 데이터 준비 없이 즉시 실행 가능. |
+
+### 2차 세션 — 어드민 백오피스 (유지)
+
+| 항목 | 파일 | 원인 / 조치 |
+|---|---|---|
+| **어드민 대시보드 API 6개 추가** | `BackofficeSuperController.java` | JSP는 `/api/dashboard/summary` 등을 호출했으나 엔드포인트 없음 → 6개 신규 추가 (summary, promoters, venue-managers, review-performances, venues, recent-reservations) |
+| **대시보드 JSP 필드명 정합** | `backoffice/super/dashboard.jsp` | `p.status`→`approvalStatus`, `v.venueManagerId`→`managerId`, `p.representativeName`→`representative` 등 도메인 실제 필드에 맞춤 |
+| **PROMOTER/VM 생성 API + UI** | `BackofficeSuperController.java`, `member-list.jsp` | `POST /api/promoters`, `POST /api/venue-managers` 엔드포인트 신규 + `member-list.jsp`에 생성 모달 2개 추가. `promoterService.registerPromoter()` / `venueManagerService.registerVenueManager()` 재사용 |
+
+### 1차 세션 내용 (유지)
+
+## 4b. 1차 세션에서 수정된 내용 (2026-04-20)
+
+| 항목 | 파일 | 원인 |
+|---|---|---|
+| **ticket-user 회원가입 차단** | `ticket-user/.../security-context.xml` | permitAll URL이 옛 경로(`/member/api/join`). 새 경로(`/api/member/join`)로 교체 |
+| **Jackson LocalDateTime 직렬화** | 3개 `root-context.xml` | `WRITE_DATES_AS_TIMESTAMPS=false` 추가 → 배열 `[2026,4,20,...]` → ISO 문자열. JSP의 `fmtDate`/`fmtDt` 배열 처리 우회 로직은 이제 불필요 (향후 정리 가능) |
+| **공연 상태 표시 (UPCOMING/ENDED)** | `ticket-user/.../performance/detail.jsp` | 판매 전 공연이 "매진"으로 보이던 문제. `performance.status`별로 `오픈 예정` / `공연 종료` / `매진` 분기 + 클릭 차단 메시지 |
+| **NoticeService.findById 트랜잭션** | `ticket-common/.../NoticeService.java` | SELECT + UPDATE(view count) 를 `@Transactional`로 묶음 |
+
+**트랜잭션 인프라 점검 결과**: 3개 WAR 모두 `tx:annotation-driven` 구성됨. 주요 서비스(MemberService, PromoterService, ReservationService, PaymentService, CouponService, VenueAdminService, NoticeService, AdminPerformanceService 등) 변경 메서드에 `@Transactional` 부여됨. 추가 적용 필요시 본 섹션 참고.
 
 ---
 
-## 3. 요청 처리 파이프라인
+## 5. 미해결 이슈 (우선순위)
 
-```
-HTTP
- → JwtAuthenticationFilter (JWT 검증)
- → RateLimitInterceptor (IP당 요청 제한, ticket-user만)
- → QueueInterceptor (공연별 동시 접속 500명 제한, ticket-user만)
- → AuthInterceptor (loginMemberId, loginRole을 request attribute에 설정)
- → Controller → Service → MyBatis Mapper → MySQL
-```
+> E2E 전 구간(공연 등록 → 승인 → 게시 → 결제) 7차 세션에서 검증 완료. 아래는 기능 미완성 / 코드 품질 이슈.
 
-**동시성 제어 (좌석)**:
-1. Redis SETNX로 좌석 락 선점
-2. DB `UPDATE ... WHERE status = 'AVAILABLE'` 낙관적 락
-3. 결제 테이블 `idempotency_key UNIQUE` 제약으로 중복 결제 방지
-4. Redis 불가 시 DB 락만으로 graceful degradation
+### ✅ 코드 설계 정리 완료 (7차 세션)
+
+- **Mapper 직접 주입 제거**: `BackofficeSuperController` Mapper 9개 → 전부 Service 계층으로 이전. `BackofficeStaffController` Mapper 2개도 동일 처리.
+- **서비스 계층 메서드 추가**: `MemberService.findAll/countFiltered/updateAdminStatus`, `VenueAdminService.findStageConfigs/createStageConfig/deleteStageConfig/findStageSections/upsertStageSection`, `AdminPerformanceService.findSchedulesByPerformanceId/createSchedule/findSectionOverrides`, `ReservationService.searchReservations/countReservations`, `PortalDashboardService.getSettlementSummary/toLong` 
+- **Payment 도메인**: `id`/`method`/`failReason` 이미 정합 완료. 추가 조치 불필요.
+- **MemberRole enum**: `STAFF`, `SUPER_ADMIN`, `PROMOTER`, `VENUE_MANAGER` 추가 완료.
+
+### 🟡 기능 미완성
+
+- **공연 공개(publish) UI 없음**: API(`POST /api/performances/{id}/publish`)는 있음. 어드민 대시보드 "공연 심사" 탭에 APPROVED 공연 대상 Publish 버튼 없음.
+- **어드민 공연 승인 전 미리보기 없음**: 일정·좌석·가격 확인 없이 승인/반려만 가능. 상세 모달 필요.
+- **파트너 좌석등급 UI 없음**: `performance-list.jsp`에 등급 설정 버튼 없음 (API는 존재).
+- **통계 API NPE**: 데이터 0건 시 `/backoffice/super/api/analytics/all` — null 방어 없음.
+
+### 🔵 개선 포인트
+
+- **파트너 계정 생성 모달**: admin `member-list.jsp`에 기획사/공연장담당자 생성 UI 이미 구현됨 (API + Modal 모두 있음).
+- **DateUtil 중복**: `ticket-common`, `ticket-user` 양쪽 존재. `ticket-user` 쪽 제거 후 common 사용.
+- **MemberRole enum dead code**: `enum { USER, ADMIN }` — 실제 역할(`SUPER_ADMIN`, `STAFF`, `PROMOTER`, `VENUE_MANAGER`)과 불일치.
+- **결제 게이트웨이 mock**: `PaymentService.simulatePgPayment()` 항상 true — 실제 PG 연동 필요.
+
+### 🟢 기능 확장 (Phase 4~5)
+
+- user: 공연 검색/필터 (카테고리·날짜·가격대), 쿠폰 적용 UI, 환불 플로우
+- partner: 판매 리포트 차트, QR 스캔 입장
+- admin: 회원 상세 조회, 강제탈퇴(예매 일괄취소), 환불 처리
 
 ---
 
-## 4. 모듈별 컨트롤러 및 뷰 현황
+## 6. 모듈 요약
 
 ### ticket-user (8080)
 
-| Controller | 주요 URL | 뷰 |
-|---|---|---|
-| `MemberController` | `GET /member/login`, `GET /member/join`, `GET /member/mypage`, `POST /api/member/join`, `POST /api/member/login`, `POST /api/member/logout` | member/login, member/join, member/mypage |
-| `PerformanceController` | `GET /`, `GET /performance/list`, `GET /performance/detail/{id}` | performance/list, performance/detail |
-| `SeatController` | `GET /seat/select/{scheduleId}`, `/api/seats/**` | seat/select |
-| `ReservationController` | `GET /reservation/confirm/{id}`, `GET /reservation/history`, `/api/reservation/**` | reservation/confirm, reservation/history |
-| `PaymentController` | `POST /api/payment/process` | (API only) |
-| `QueueController` | `GET /queue/waiting`, `/api/queue/**` | queue/waiting |
-
-**뷰 목록**: join, login, mypage, performance/list, performance/detail, seat/select, reservation/confirm, reservation/history, queue/waiting, error/404, 500, 503
+Controller: MemberController, PerformanceController, SeatController, ReservationController, PaymentController, QueueController
+전용 서비스: PerformanceService, SeatService(Redis 좌석 락), QueueService(@Scheduled 3s), PaymentService
+전용 인터셉터: AuthInterceptor, RateLimitInterceptor(30 req/min), QueueInterceptor
 
 ### ticket-partner (8081)
 
-| Controller | 주요 URL | 뷰 |
-|---|---|---|
-| `PartnerLoginController` | `GET /partner/login`, `POST /partner/api/login`, `POST /partner/api/logout` | member/login |
-| `PartnerPromoterController` | `GET /partner/promoter/dashboard`, `/performances`, `/performances/new`, `/sales-report`, `/settlement` + 다수 API | partner/promoter/* |
-| `PartnerVenueController` | `GET /partner/venue/dashboard`, `/venue-info`, `/schedule-calendar`, `/entrance` + 다수 API | partner/venue/* |
-| `PartnerCouponController` | `GET /partner/promoter/notices` + API | partner/promoter/notices |
-
-**뷰 목록**: partner/promoter/dashboard, performance-list, performance-form, sales-report, settlement, notices, partner/venue/dashboard, venue-info, schedule-calendar, entrance
+Controller: PartnerLoginController, PartnerPromoterController, PartnerVenueController, PartnerCouponController
+전용 서비스: VenueManagerService, EntranceService
 
 ### ticket-admin (8082)
 
-| Controller | 주요 URL | 뷰 |
-|---|---|---|
-| `AdminLoginController` | `GET /admin/login`, `POST /admin/api/login`, `POST /admin/api/logout` | member/login |
-| `BackofficeSuperController` | `/backoffice/super/dashboard`, `member-list`, `settlement`, + 공연/좌석/기획사 승인 다수 API | backoffice/super/* |
-| `BackofficeStaffController` | `/backoffice/staff/dashboard`, `reservation-search`, `member-search` + API | backoffice/staff/* |
-| `BackofficeCouponController` | `/backoffice/super/coupons`, `/notices` + API | backoffice/super/coupons, notices |
-| `BackofficeAnalyticsController` | `/backoffice/super/api/analytics/**` | (API only) |
-| `BackofficeSuperAnalyticsController` | `/backoffice/super/statistics` | backoffice/super/statistics |
+Controller: AdminLoginController, BackofficeSuperController, BackofficeStaffController, BackofficeCouponController, BackofficeAnalyticsController, BackofficeSuperAnalyticsController
 
-**뷰 목록**: backoffice/super/dashboard, member-list, statistics, settlement, coupons, notices, backoffice/staff/dashboard, reservation-search, member-search
+### ticket-common
+
+- 도메인 20개 (Member/Performance/Schedule/Seat/SeatInventory/Reservation/ReservationSeat/Payment/Coupon/CouponTemplate/Promoter/VenueManager/Venue 등)
+- 서비스 11개 (MemberService, ReservationService, CouponService, PromoterService, VenueAdminService, VenueManagerService, EntranceService, NoticeService, PerformanceApprovalService, AdminPerformanceService, PortalDashboardService)
+- 매퍼 인터페이스 21개 + MyBatis XML 18개
 
 ---
 
-## 5. 공통 모듈 (ticket-common)
+## 7. 주요 워크플로우
 
-### 도메인 클래스 (20개)
+**공연 승인**: DRAFT → REVIEW → APPROVED / REJECTED → PUBLISHED
 
-`Member`, `Performance`, `Schedule`, `Seat`, `SeatInventory`, `Reservation`, `ReservationSeat`, `Payment`, `Coupon`, `CouponTemplate`, `Promoter`, `VenueManager`, `Venue`, `VenueSection`, `VenueStageConfig`, `VenueStageSection`, `VenueSeatTemplate`, `PerformanceSeatGrade`, `PerformanceSectionOverride`, `Notice`, `EntranceLog`
+**좌석 예매 (Dual-Defense)**:
+1. Redis Lua 스크립트로 원자적 선점 (HOLD 10분)
+2. DB `WHERE status='AVAILABLE'` 낙관적 락
+3. Payment에 `idempotency_key UNIQUE` 중복 결제 차단
+4. Redis 장애 시 DB-only 모드로 강등 (graceful)
 
-### 서비스 클래스 (11개)
-
-`MemberService`, `PerformanceApprovalService`, `AdminPerformanceService`, `PromoterService`, `VenueManagerService`, `VenueAdminService`, `ReservationService`, `CouponService`, `NoticeService`, `EntranceService`, `PortalDashboardService`
-
-### Mapper (21개)
-
-`MemberMapper`, `PerformanceMapper`, `ScheduleMapper`, `SeatMapper`, `SeatInventoryMapper`, `ReservationMapper`, `PaymentMapper(user모듈)`, `CouponMapper`, `PromoterMapper`, `VenueManagerMapper`, `VenueMapper`, `VenueSectionMapper`, `VenueStageConfigMapper`, `VenueStageSectionMapper`, `VenueSeatTemplateMapper`, `PerformanceSeatGradeMapper`, `PerformanceSectionOverrideMapper`, `NoticeMapper`, `EntranceLogMapper`, `AnalyticsMapper`, `PortalQueryMapper`
-
-### 주요 Enum
-
-- `MemberRole`: MEMBER, PROMOTER, VENUE_MANAGER, STAFF, SUPER_ADMIN
-- `ReservationStatus`: PENDING, CONFIRMED, CANCELLED, REFUNDED
-- `PaymentStatus`: PENDING, COMPLETED, FAILED, REFUNDED
-- `SeatStatus`: AVAILABLE, HELD, RESERVED, BLOCKED
-- `Performance.approvalStatus`: DRAFT, REVIEW, APPROVED, REJECTED, PUBLISHED
-
-### 공연 승인 워크플로우
-
-```
-PROMOTER 등록 → DRAFT
-→ submit 요청 → REVIEW
-→ SUPER_ADMIN 승인 → APPROVED
-→ SUPER_ADMIN publish → PUBLISHED (공개 판매 시작)
-→ SUPER_ADMIN 반려 → REJECTED (수정 후 재요청 가능)
-```
+**예매 상태**: PENDING(선점) → CONFIRMED(결제완료) → CANCELLED / REFUNDED
 
 ---
 
-## 6. 이번 세션에서 완료한 작업
+## 8. 파일 위치 빠른 참조
 
-### 서버 기동 관련 (초기 설정)
-
-- STS `testEnvironment="true"` 설정으로 tmp1/2/3 격리 배포 구성
-- 포트 충돌 수정 (8005/6/7 shutdown, 8080/1/2 HTTP)
-- Spring Security에 `pattern="/" permitAll` 추가로 STS 180초 타임아웃 해결
-- `root-context.xml` MyBatis mapperLocations를 `classpath:` (star 없음)로 수정 — 중복 namespace 오류 해결
-
-### 도메인 수정
-
-- `Performance`: `ageLimit`, `runningTime`, `minPrice` 필드 추가, `getGenre()` alias getter 추가
-- `Schedule`: `getStartDatetime()` computed getter 추가 (showDate + showTime 조합)
-- `Coupon`: `getCouponName()`, `getDiscountAmount()`, `getExpiryDate()` alias getter 추가
-
-### JSP 버그 수정
-
-- JSP에서 `p.id` → `p.performanceId` 등 잘못된 프로퍼티 참조 수정
-- `fmt:formatDate` (Java 8 LocalDate 미지원) → 커스텀 TLD `tl:fmt` 방식으로 변경
-- `DateUtil.java`를 `ticket-user/src/main/java`에 배치하여 Eclipse WTP 컴파일 적용
-
-### 가입 플로우 분리
-
-- `member/join.jsp`에서 PROMOTER/VENUE_MANAGER 탭 제거 → MEMBER 전용 가입만 유지
-- `MemberController`에서 promoter/venue-manager join 엔드포인트 제거
-
-### 로그인 API URL 수정 (전 포털 공통 버그)
-
-| 포털 | 수정 전 | 수정 후 |
-|---|---|---|
-| ticket-user login | `/member/api/login` | `/api/member/login` |
-| ticket-user join | `/member/api/join` | `/api/member/join` |
-| ticket-user logout | `/member/api/logout` | `/api/member/logout` |
-| ticket-partner login | `/api/member/login` | `/partner/api/login` |
-| ticket-partner logout | `/api/member/logout` | `/partner/api/logout` |
-| ticket-admin login | `/api/member/login` | `/admin/api/login` |
-| ticket-admin logout | `/api/member/logout` | `/admin/api/logout` |
-
-### 로그인 UI 리디자인
-
-- ticket-partner `member/login.jsp`: 구식 Bootstrap card → PARTNER PORTAL 브랜딩 재설계
-- ticket-admin `member/login.jsp`: 구식 Bootstrap card → BACKOFFICE 브랜딩 재설계
-- 파트너/어드민 로그인 페이지에서 회원가입 링크 제거
-
-### 루트 경로 리다이렉트
-
-- ticket-partner: `GET /` → redirect `/partner/login`
-- ticket-admin: `GET /` → redirect `/admin/login`
-
-### 레거시 컨트롤러 삭제
-
-삭제된 파일:
-- `ticket-partner`: `PromoterController.java` (`/promoter/**`), `VenueManagerController.java` (`/venue-manager/**`)
-- `ticket-admin`: `AdminController.java` (`/admin/**`), `SuperAdminController.java` (`/superadmin/**`)
-- `ticket-admin`: `admin/dashboard.jsp`, `superadmin/dashboard.jsp`
-- `ticket-admin` `tiles-config.xml`: `admin/dashboard`, `superadmin/dashboard` 정의 제거
-- 각 security-context.xml에서 레거시 intercept-url 제거
-
-### common.js 개선 (파트너/어드민)
-
-- `patch` 메서드 추가
-- `toast` 유틸 추가 (SweetAlert2 기반 toast)
-- 로그아웃 URL 각 포털 전용 API로 수정
-
-### 어드민 버그 수정
-
-- `backoffice-layout.jsp`: Public Site 링크 `http://localhost:8080/` (새 탭) 으로 수정
-- `backoffice-sidebar.jsp`: My Account → 로그아웃 버튼으로 교체
-- `settlement.jsp`: API URL `/settlement/report` → `/settlement` 수정
-- `notices.jsp`, `coupons.jsp`: `LocalDateTime` 배열 직렬화 처리 (`fmtDate`, `fmtDt` 함수 개선)
-- `BackofficeCouponController`: `datetime-local` 입력값(`HH:mm` 초 없음) 파싱 수정
-- `statistics.jsp`: 페이지 로드 시 일별 트렌드 차트 즉시 표시
+| 목적 | 경로 |
+|---|---|
+| 도메인 | `ticket-common/src/main/java/com/ticketlegacy/domain/` |
+| 서비스 | `ticket-common/src/main/java/com/ticketlegacy/service/` |
+| 매퍼 XML | `ticket-common/src/main/resources/mybatis/mapper/` |
+| JWT 필터 | `ticket-*/src/main/java/.../web/filter/JwtAuthenticationFilter.java` |
+| 시큐리티 | `ticket-*/src/main/webapp/WEB-INF/spring/security-context.xml` |
+| MVC | `ticket-*/src/main/webapp/WEB-INF/spring/servlet-context.xml` |
+| DB·MyBatis | `ticket-*/src/main/webapp/WEB-INF/spring/root-context.xml` |
+| Tiles | `ticket-*/src/main/webapp/WEB-INF/tiles/tiles-config.xml` |
+| 배포 스크립트 | `deploy-sync.sh` |
+| **DB 스키마 + 시드** | **`db/init.sql`** |
 
 ---
 
-## 7. 미해결 이슈 및 TODO
+## 9. 트러블슈팅
 
-### 긴급 (기능 불가)
-
-#### ticket-user
-
-- [ ] **회원가입 미작동**: `/api/member/join` 호출 시 오류 발생 여부 미확인 — `MemberService.join()` 내부 로직 및 DB insert 검증 필요
-- [ ] **공연 상태 표시 오류**: 판매 전 공연이 "매진"으로 표시됨 — `performance/list.jsp` 또는 `PerformanceService`에서 status 판정 로직 확인 필요. `UPCOMING` 상태를 "오픈 예정"으로, `SOLD_OUT`만 "매진"으로 표시해야 함
-- [ ] **좌석 선택 → 결제 플로우 전체 미검증**: seat/select.jsp → 결제 API → 예매 확인 전 구간
-
-#### ticket-partner
-
-- [ ] **500/503 오류 다수**: 어떤 페이지/기능인지 로그로 추가 확인 필요
-  - 대시보드 API 실패 가능성 (DB 데이터 없을 경우)
-  - 공연 등록 폼 submit 미검증
-  - 정산 조회 미검증
-
-#### ticket-admin
-
-- [ ] **쿠폰 생성 500 재확인**: Java 수정(BackofficeCouponController) 후 서버 재시작 필요
-- [ ] **통계 API 실패 여부**: `/backoffice/super/api/analytics/all` — DB에 데이터가 없으면 NPE 등 발생 가능
-- [ ] **회원 관리 공연 승인 기능 미검증**: 기획사 신청 승인/반려 플로우
-
-### 구조적 개선 필요
-
-- [ ] **`DateUtil` 중복**: `ticket-common`에 있으나 `ticket-user`에도 중복 존재 — `ticket-common` 것을 사용하고 `ticket-user` 것 제거 필요 (STS WTP 클래스로딩 이슈로 임시 추가한 것)
-- [ ] **Jackson LocalDateTime 직렬화**: `root-context.xml`의 Jackson ObjectMapper에 `WRITE_DATES_AS_TIMESTAMPS = false` 미설정 — 현재 LocalDateTime이 배열 `[2026,4,17,14,30,0]`로 직렬화됨. 각 JSP에서 배열/문자열 양쪽 처리하는 `fmtDate`/`fmtDt` 헬퍼로 우회 중. 근본 수정: `root-context.xml`에 아래 추가:
-  ```xml
-  <property name="featuresToDisable">
-      <array>
-          <value>#{T(com.fasterxml.jackson.databind.SerializationFeature).WRITE_DATES_AS_TIMESTAMPS}</value>
-      </array>
-  </property>
-  ```
-  이 수정 시 모든 날짜가 ISO 문자열로 통일되어 JS 처리가 단순해짐
-- [ ] **PROMOTER/VENUE_MANAGER 계정 생성 UI 부재**: 현재 어드민에서 파트너 계정을 생성할 수 있는 UI가 없음. `BackofficeSuperController`에 API는 있으나 화면이 없음 — 회원 관리 페이지에 "파트너 계정 생성" 모달 추가 필요
-
-### 기능 확장 (추가 개발)
-
-#### ticket-user 확장 포인트
-
-- [ ] 공연 검색/필터 (카테고리, 날짜, 지역, 가격대)
-- [ ] 공연 상세 → 리뷰/별점 기능
-- [ ] 마이페이지: 쿠폰 목록 표시 및 적용, 취소/환불 내역
-- [ ] 결제 게이트웨이 실제 연동 (현재 mock 처리)
-- [ ] SNS 공유 기능
-
-#### ticket-partner 확장 포인트
-
-- [ ] 공연 등록 폼(`performance-form.jsp`) — 스케줄/좌석 등급 설정 UI 완성도 검증
-- [ ] 판매 리포트 차트 구현 (현재 테이블만)
-- [ ] 기획사 정산 내역 상세 (월별 breakdown)
-- [ ] 입장 QR 스캔 연동 (현재 예매번호 수동 입력)
-- [ ] 공연장 좌석 배치도 시각화
-
-#### ticket-admin 확장 포인트
-
-- [ ] 파트너 계정 생성/관리 UI
-- [ ] 회원 상세 조회 페이지 (현재 목록만)
-- [ ] 공연 승인 페이지 (현재 dashboard에 포함 — 별도 페이지로 분리 고려)
-- [ ] 환불 처리 기능
-- [ ] 공지사항 수신 대상별 미리보기
-
----
-
-## 8. 배포 주의사항
-
-### 소스 변경 후 배포 절차
-
-```
-1. 소스 파일 수정 (ticket-*/src/main/...)
-2. bash deploy-sync.sh [user|partner|admin|all]
-3. Java 파일 변경 있으면 → STS에서 해당 서버 Restart
-4. JSP/CSS/JS만 변경 → 브라우저 새로고침으로 반영 (JSP 캐시는 스크립트가 자동 삭제)
-```
-
-### PID 강제 종료 (포트 충돌 시)
-
+**포트 충돌**
 ```bash
-# 현재 포트 사용 PID 확인
 netstat -ano | grep -E "8080|8081|8082"
-
-# 강제 종료 (Windows)
 taskkill /PID <pid> /F
 ```
 
-### 서버 설정 파일 위치
+**Redis 없이 ticket-user 기동 실패**
+→ `root-context.xml`의 `LettuceConnectionFactory`는 연결 실패 시 예외. Redis 반드시 실행.
 
+**MyBatis 중복 namespace 오류**
+→ `mapperLocations`를 `classpath:` (star 없음)로. 이미 `classpath:mybatis/mapper/**/*.xml`로 설정됨.
+
+**DB 초기화 / 시드 재주입**
+```bash
+mysql -uroot -p1234 < db/init.sql
 ```
-Servers/Tomcat v9.0 Server at localhost (ticket-user)-config/server.xml    (port: 8005/8080)
-Servers/Tomcat v9.0 Server at localhost (ticket-partner)-config/server.xml  (port: 8006/8081)
-Servers/Tomcat v9.0 Server at localhost (ticket-admin)-config/server.xml    (port: 8007/8082)
+→ `springgreen6` 스키마 DROP + 재생성 + 시드. 기존 데이터 전부 삭제되므로 개발 환경에서만 사용.
+
+---
+
+## 10. 3차 세션에서 발견된 코드 레벨 이슈 (운영 영향)
+
+> 본 섹션의 이슈들은 `db/init.sql` 만들며 도메인 ↔ 매퍼 XML 대조 중 발견한 것. 스키마는 동작하는 매퍼 기준으로 만들었으나, 도메인 정리가 필요한 부분.
+
+### 1) `Payment` 도메인 ↔ `PaymentMapper.xml` 컬럼명 불일치
+
+- **도메인 필드**: `paymentId`, `idempotencyKey`, `method`, `failureReason`
+- **매퍼 컬럼** : `id`, `idempotency_key`, (없음), `fail_reason`
+- 매퍼 resultMap 은 `<id property="id" column="id" />` 로 매핑하지만, `Payment.java` 에 `id` 필드가 없어 **PK가 도메인에 영원히 안 채워짐**. `method` / `failureReason` 필드도 매퍼가 세팅하지 않음.
+- 파일: `ticket-common/src/main/java/com/ticketlegacy/domain/Payment.java`, `ticket-user/src/main/resources/mybatis/mapper/PaymentMapper.xml`
+- **조치 안**: Payment 도메인을 매퍼 컬럼에 맞춰 재정의하거나, 매퍼 resultMap 을 도메인에 맞춰 수정. 어느 쪽이든 깨진 필드(`method`, `failureReason`, `paymentId`) 사용처 없는지 grep 후 정리 필요.
+
+### 2) `MemberRole` enum이 dead code
+
+- `ticket-common/.../domain/enums/MemberRole.java` 는 `enum { USER, ADMIN }` 만 정의.
+- 실제 코드(MemberService, PromoterService, VenueManagerService, security-context.xml)는 `SUPER_ADMIN`, `STAFF`, `PROMOTER`, `VENUE_MANAGER` 문자열을 직접 사용.
+- **조치 안**: enum 을 실제 사용 값으로 확장하고 문자열 리터럴을 enum 참조로 교체. 또는 enum 삭제.
+
+### 3) ~~`PromoterService.registerPromoter` 가 member.status 를 즉시 ACTIVE 로 세팅~~ ✅ 해결 (9차)
+
+- 9차 세션에서 `registerPromoter(RegisterPromoterCommand)`로 재작성. member.status를 `PENDING_APPROVAL`로 초기화하고, `approvePromoter()` 시 `ACTIVE`로 전환하도록 수정.
+
+---
+
+## 11. 5차 세션 수정 내역 (2026-04-30)
+
+| 항목 | 파일 | 내용 |
+|---|---|---|
+| **쿠키명 분리** | 3개 모듈 `JwtAuthenticationFilter.java`, 로그인/로그아웃 컨트롤러, `partner-layout.jsp` | `ACCESS_TOKEN` → `USER_TOKEN` / `ADMIN_TOKEN` / `PARTNER_TOKEN`. localhost 동일 도메인에서 쿠키 덮어쓰기 방지 |
+| **cancelOrphan 추가** | `ReservationService.java`, `PaymentController.java` | memberId 소유권 검사 없는 시스템 취소 메서드. 결제 실패 후 PENDING 예약 누적 방지 |
+| **쿠폰 ISSUED 필터** | `CouponMapper.xml` | `findByMemberId`에 `AND c.status = 'ISSUED' AND c.expires_at > NOW()` 추가 |
+| **어드민 공연 탭** | `dashboard.jsp` | REVIEW+APPROVED 동시 표시, 게시(Publish) 버튼, 회원관리 Quick Link |
+| **파트너 null 가드** | `PartnerPromoterController.java`, `PartnerVenueController.java` | `currentPromoterId()` / `currentVenueId()` null 시 BusinessException(AUTH_FORBIDDEN) |
+
+**⚠️ 재시작 시 주의**: 쿠키명이 변경되었으므로 브라우저에서 **기존 `ACCESS_TOKEN` 쿠키를 수동 삭제** 후 재로그인해야 합니다. 개발자도구 → Application → Cookies → `localhost` → `ACCESS_TOKEN` 삭제.
+
+### 4) 시드용 `INSERT … SELECT` 순서 함정 (참고용)
+
+- `INSERT INTO seat … WITH RECURSIVE` 조합 시 `seat_id` 가 expected 순서로 부여된다는 보장 없음.
+- `db/init.sql` 에서는 `ORDER BY` + reservation seed 의 seat_id 조회 기반 처리로 회피 중. 향후 시드 추가 시 동일 패턴 권장 (seat_id 하드코딩 금지).
+
+---
+
+## 12. 고도화 로드맵 (7차 세션 수립)
+
+### ✅ Phase A — 인프라 기반 (8차 세션 완료)
+
+- **`MemberStatus` FSM enum**: PENDING_APPROVAL/ACTIVE/SUSPENDED/DORMANT/WITHDRAWN + `canTransitionTo()` 전환 규칙 명시
+- **`Member.password` @JsonIgnore**: 비밀번호 JSON 응답 노출 보안 이슈 수정
+- **`ApiResponse<T>` 개선**: `successMessage()` 추가, `error(String)` errorCode "UNKNOWN"→INVALID_INPUT 수정, `ValidationError` 내부 클래스 추가
+- **`PageResponse<T>` 신규**: 페이지네이션 표준 래퍼 (content/page/size/totalElements/totalPages/first/last)
+- **`GlobalExceptionHandler` 3-WAR 동기화**: `HttpMessageNotReadableException`(JSON 파싱 오류→400), `MissingServletRequestParameterException`(필수 파라미터 누락→400) 핸들러 추가
+- **`ErrorCode` 확장**: `MEMBER_STATUS_INVALID_TRANSITION`, `MEMBER_ALREADY_WITHDRAWN` 추가
+
+### ✅ Phase B1 — Member 도메인 봉인 (8차 세션 완료)
+
+**봉인 기준 달성: 이 도메인은 더 이상 구조 변경 없이 기능 추가만.**
+
+| 항목 | 내용 |
+|---|---|
+| `MemberSearchQuery` | `@Valid @ModelAttribute` — role/status/keyword/page/size 타입 쿼리 |
+| `MemberStatusCommand` | `@Valid @RequestBody` — `MemberStatus` enum + `@NotNull` |
+| `MemberSummaryDto` | password 제외 안전한 응답 DTO, `MemberSummaryDto.from(Member)` static factory |
+| `MemberService.searchMembers()` | `PageResponse<MemberSummaryDto>` 반환 — 타입 안전 |
+| `MemberService.updateAdminStatus()` | FSM `canTransitionTo()` 검증 → WITHDRAWN 터미널 상태 방어 |
+| 컨트롤러 | `BackofficeSuperController`, `BackofficeStaffController` 완전 typed — `Map<>` 없음 |
+| JSP | `response.data.content` 구조 반영, SUSPENDED 상태 옵션 추가 |
+
+**Member 상태 FSM:**
+```
+PENDING_APPROVAL → ACTIVE, SUSPENDED
+ACTIVE           → SUSPENDED, WITHDRAWN, DORMANT
+SUSPENDED        → ACTIVE, WITHDRAWN
+DORMANT          → ACTIVE
+WITHDRAWN        → (없음) — terminal
+```
+
+### ✅ Phase B2 — Promoter 도메인 봉인 (9차 세션 완료)
+
+**봉인 기준 달성: 이 도메인은 더 이상 구조 변경 없이 기능 추가만.**
+
+| 항목 | 내용 |
+|---|---|
+| `PromoterApprovalStatus` | FSM enum — PENDING/APPROVED/REJECTED/SUSPENDED + `canTransitionTo()` 전환 규칙 |
+| `RegisterPromoterCommand` | `@NotBlank` email·password·name·companyName, `@Size(min=8)` password, `@Email` 검증 |
+| `PromoterRejectCommand` | reason `@Size(max=500)` — optional이지만 크기 제한 |
+| `PromoterSearchQuery` | status/page/size + `@Min`/`@Max` 범위 검증 |
+| `PromoterSummaryDto` | 민감 정보 없는 안전한 응답 DTO, `PromoterSummaryDto.from(Promoter)` static factory |
+| `PromoterService` | `registerPromoter(RegisterPromoterCommand)` 완전 typed. approve/reject/suspend 모두 FSM 검증 추가. `searchPromoters()` → `PageResponse<PromoterSummaryDto>`, `findApprovedSummaries()` 신규 |
+| `ErrorCode.PRO_005` | `PROMOTER_STATUS_INVALID_TRANSITION` — 허용되지 않는 상태 전환 |
+| 컨트롤러 | `listPromoters`, `createPromoter`, `approvePromoter`, `rejectPromoter`, `suspendPromoter` 완전 typed. `dashboardPromoters` → `List<PromoterSummaryDto>`. `settlementPage` → `findApprovedSummaries()` |
+
+**Promoter 승인 FSM:**
+```
+PENDING   → APPROVED, REJECTED
+APPROVED  → SUSPENDED, REJECTED
+REJECTED  → (없음) — terminal
+SUSPENDED → APPROVED, REJECTED
 ```
 
 ---
 
-## 9. 핵심 파일 위치 빠른 참조
+### ✅ Phase B3 — VenueManager 도메인 봉인 (9차 세션 완료)
 
-| 목적 | 파일 경로 |
+**봉인 기준 달성: 이 도메인은 더 이상 구조 변경 없이 기능 추가만.**
+
+| 항목 | 내용 |
 |---|---|
-| 공통 도메인 | `ticket-common/src/main/java/com/ticketlegacy/domain/` |
-| 공통 서비스 | `ticket-common/src/main/java/com/ticketlegacy/service/` |
-| MyBatis XML | `ticket-common/src/main/resources/mybatis/mapper/` |
-| JWT 필터 | `ticket-*/src/main/java/.../web/filter/JwtAuthenticationFilter.java` |
-| 시큐리티 설정 | `ticket-*/src/main/webapp/WEB-INF/spring/security-context.xml` |
-| MVC 설정 | `ticket-*/src/main/webapp/WEB-INF/spring/servlet-context.xml` |
-| DB/MyBatis 설정 | `ticket-*/src/main/webapp/WEB-INF/spring/root-context.xml` |
-| 타일즈 설정 | `ticket-*/src/main/webapp/WEB-INF/tiles/tiles-config.xml` |
-| TLD (날짜 포맷) | `ticket-user/src/main/webapp/WEB-INF/tlds/tl.tld` |
-| 배포 스크립트 | `ticket-parent/deploy-sync.sh` |
-| 유저 공통 JS | `ticket-user/src/main/webapp/resources/js/common.js` |
-| 파트너 공통 JS | `ticket-partner/src/main/webapp/resources/js/common.js` |
-| 어드민 공통 JS | `ticket-admin/src/main/webapp/resources/js/common.js` |
+| `VenueManagerApprovalStatus` | FSM enum — PENDING/APPROVED/REJECTED + `canTransitionTo()` |
+| `RegisterVenueManagerCommand` | `@NotBlank` email·password·name, `@NotNull` venueId, `@Size(min=8)` password |
+| `VenueManagerSearchQuery` | status/page/size + `@Min`/`@Max` |
+| `VenueManagerSummaryDto` | 안전한 응답 DTO, `from(VenueManager)` static factory |
+| `VenueManagerMapper` | `findAll`/`countAll` 추가 (상태 무관 전체 조회 지원) |
+| `VenueManagerService` | `registerVenueManager(Command)` typed, approve/reject FSM 검증, `searchVenueManagers()` → `PageResponse<VenueManagerSummaryDto>` |
+| `ErrorCode.VM_005` | `VENUE_MANAGER_STATUS_INVALID_TRANSITION` 추가 |
+| 컨트롤러 | `listVenueManagers`, `createVenueManager`, `approveVenueManager`, `rejectVenueManager` 완전 typed. `dashboardVenueManagers` → `List<VenueManagerSummaryDto>` |
+
+**VenueManager 승인 FSM:**
+```
+PENDING  → APPROVED, REJECTED
+APPROVED → REJECTED
+REJECTED → (없음) — terminal
+```
+
+---
+
+### ✅ Phase B4 — Performance 도메인 봉인 (9차 세션 완료)
+
+**봉인 기준 달성: 이 도메인은 더 이상 구조 변경 없이 기능 추가만.**
+
+| 항목 | 내용 |
+|---|---|
+| `PerformanceApprovalStatus` | FSM enum — DRAFT/REVIEW/APPROVED/REJECTED/PUBLISHED |
+| `PerformanceReviewCommand` | note `@Size(max=1000)` — approve/reject 공통 |
+| `PerformanceSearchQuery` | approvalStatus/page/size + `@Min`/`@Max` |
+| `PerformanceSummaryDto` | 안전한 응답 DTO, `from(Performance)` static factory |
+| `PerformanceApprovalService` | 모든 상태 전환 FSM `validateTransition()` 적용. `searchPerformances()` → `PageResponse<PerformanceSummaryDto>` |
+| `ErrorCode.PERF_006` | `PERFORMANCE_STATUS_INVALID_TRANSITION` 추가 |
+| 컨트롤러 | `listPerformances`, `approvePerformance`, `rejectPerformance`, `publishPerformance`, `rollbackToDraft` 완전 typed |
+| `dashboard.jsp` | `reviewResp[0].list` → `reviewResp[0].data.content` 수정 |
+
+**Performance 승인 FSM:**
+```
+DRAFT     → REVIEW
+REVIEW    → APPROVED, REJECTED
+APPROVED  → PUBLISHED, DRAFT (관리자 롤백)
+REJECTED  → REVIEW, DRAFT (관리자 롤백)
+PUBLISHED → (없음) — terminal
+```
+
+---
+
+### ✅ Phase 1 — 코드 설계 정리 (7차 세션 완료)
+
+**목표**: Mapper 직접 주입 제거 + 비즈니스 로직 서비스 계층으로 이동
+
+| 작업 | 대상 파일 | 내용 |
+|---|---|---|
+| VenueAdminService 메서드 추가 | `ticket-common/.../VenueAdminService.java` | `createStageConfig()`, `upsertStageSection()` — 컨트롤러에서 꺼냄 |
+| AdminPerformanceService 메서드 추가 | `ticket-common/.../AdminPerformanceService.java` | `createSchedule()`, `savePerformanceSectionOverride()` 트랜잭션 래핑 |
+| MemberService.updateStatus() 추가 | `ticket-common/.../MemberService.java` | `@Transactional` + 감사 이력. admin/staff 양쪽에서 사용 |
+| 정산 집계 서비스 이동 | `PortalDashboardService` or 신규 `SettlementService` | `listSettlements()` 집계 로직 + `toLong/toInt` 헬퍼 이동 |
+| 컨트롤러 Mapper 주입 제거 | `BackofficeSuperController.java`, `BackofficeStaffController.java` | 위 서비스 메서드 사용으로 교체 후 9개 Mapper `@Autowired` 제거 |
+| Payment 도메인 정합 | `ticket-common/.../domain/Payment.java` | `paymentId`→`id`, `method`, `failureReason` 필드·getter 매퍼와 일치 |
+| MemberRole enum 확장 | `ticket-common/.../domain/enums/MemberRole.java` | `SUPER_ADMIN`, `STAFF`, `PROMOTER`, `VENUE_MANAGER` 추가 |
+
+### Phase 2 — 어드민 기능 완성
+
+| 작업 | 파일 | 내용 |
+|---|---|---|
+| Publish 버튼 UI | `super/dashboard.jsp` | APPROVED 공연 행에 "게시" 버튼 → `POST /backoffice/super/api/performances/{id}/publish` |
+| 공연 승인 전 미리보기 | `super/dashboard.jsp` + API | 심사 탭에서 공연 클릭 시 일정·좌석·가격 모달 노출 |
+| 통계 NPE 방어 | `BackofficeAnalyticsController.java` | 데이터 0건 시 빈 컬렉션 반환 (null 대신) |
+| 회원 상세 조회 | `super/member-list.jsp` + API | 회원 행 클릭 → 예약 이력·쿠폰·정지 이력 모달 |
+| 강제 탈퇴 | `MemberService.java` + 컨트롤러 | 예매 일괄취소 + 회원 WITHDRAWN 상태 전환 (동일 트랜잭션) |
+
+### Phase 3 — 파트너 기능 완성
+
+| 작업 | 파일 | 내용 |
+|---|---|---|
+| 좌석등급 설정 UI | `promoter/performance-list.jsp` | 공연 행에 "등급 설정" 버튼 → 모달에서 구역별 grade/price 입력 → `POST /api/performances/{id}/seat-grades` |
+| 파트너 계정 생성 모달 | `super/member-list.jsp` | 어드민에서 기획사/공연장담당자 생성 (API 이미 있음, UI만 없음) |
+| 판매 리포트 | `promoter/sales-report.jsp` | 회차별 판매율 차트 (Bar Chart), 등급별 매출 도넛 |
+
+### Phase 4 — 유저 기능 강화
+
+| 작업 | 파일 | 내용 |
+|---|---|---|
+| 공연 검색/필터 | `performance/list.jsp` + `PerformanceMapper.xml` | 카테고리·날짜·가격대 필터 + 키워드 검색 |
+| 쿠폰 적용 UI | `reservation/payment.jsp` | 결제 화면에서 보유 쿠폰 선택 → 할인 금액 실시간 반영 |
+| 환불 플로우 | `ReservationService.java` + JSP | 마이페이지에서 환불 신청 → REFUNDED 상태 전환 + seat_inventory AVAILABLE 복원 |
+
+### Phase 5 — 코드 정리
+
+| 작업 | 내용 |
+|---|---|
+| DateUtil 중복 제거 | `ticket-user` 쪽 DateUtil 삭제, `ticket-common` 참조로 통일 |
+| JSP 날짜 헬퍼 정리 | `fmtDate`/`fmtDt` 배열 처리 분기 제거 (ISO 문자열로 통일된 상태) |

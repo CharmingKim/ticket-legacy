@@ -29,7 +29,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-600">${r.performanceTitle}</div>
-                                    <div class="text-muted" style="font-size:.8rem">${r.venueName}</div>
+                                    <div class="text-muted" style="font-size:.8rem">${r.venue}</div>
                                 </td>
                                 <td>
                                     <c:if test="${not empty r.scheduleDatetime}">
@@ -37,10 +37,10 @@
                                     </c:if>
                                 </td>
                                 <td>
-                                    <span class="tl-badge tl-badge-muted">${r.seatLabel}</span>
+                                    <span class="tl-badge tl-badge-muted">${r.seatCount}석</span>
                                 </td>
                                 <td class="fw-700">
-                                    <fmt:formatNumber value="${r.finalAmount}" type="number" />원
+                                    <fmt:formatNumber value="${r.totalAmount}" type="number" />원
                                 </td>
                                 <td>
                                     <c:choose>

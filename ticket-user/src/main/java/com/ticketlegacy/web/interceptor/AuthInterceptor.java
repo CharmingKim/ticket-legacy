@@ -51,7 +51,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     private String extractTokenFromCookie(HttpServletRequest request) {
         if (request.getCookies() == null) return null;
         return Arrays.stream(request.getCookies())
-                .filter(c -> "ACCESS_TOKEN".equals(c.getName()))
+                .filter(c -> "USER_TOKEN".equals(c.getName()))
                 .map(Cookie::getValue)
                 .findFirst().orElse(null);
     }

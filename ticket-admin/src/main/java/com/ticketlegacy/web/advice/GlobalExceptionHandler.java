@@ -9,7 +9,9 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -63,6 +65,22 @@ public class GlobalExceptionHandler {
         ModelAndView mav = new ModelAndView("error/503");
         mav.addObject("message", "일시적인 서비스 장애입니다. 잠시 후 다시 시도해주세요.");
         return mav;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<?>> handleUnreadableMessage(HttpMessageNotReadableException e) {
+        log.warn("[JSON_PARSE_ERROR] {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("요청 본문을 읽을 수 없습니다. JSON 형식을 확인해주세요."));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<?>> handleMissingParam(MissingServletRequestParameterException e) {
+        log.warn("[MISSING_PARAM] {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("필수 파라미터가 누락되었습니다: " + e.getParameterName()));
     }
 
     @ExceptionHandler({IllegalStateException.class, IllegalArgumentException.class})

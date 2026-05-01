@@ -2,6 +2,11 @@ package com.ticketlegacy.service;
 
 import com.ticketlegacy.domain.Member;
 import com.ticketlegacy.domain.Promoter;
+import com.ticketlegacy.domain.enums.PromoterApprovalStatus;
+import com.ticketlegacy.dto.request.PromoterSearchQuery;
+import com.ticketlegacy.dto.request.RegisterPromoterCommand;
+import com.ticketlegacy.dto.response.PageResponse;
+import com.ticketlegacy.dto.response.PromoterSummaryDto;
 import com.ticketlegacy.exception.BusinessException;
 import com.ticketlegacy.exception.ErrorCode;
 import com.ticketlegacy.repository.MemberMapper;
@@ -14,51 +19,48 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PromoterService {
 
-    private final PromoterMapper     promoterMapper;
-    private final MemberMapper       memberMapper;
-    private final PerformanceMapper  performanceMapper;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final PromoterMapper         promoterMapper;
+    private final MemberMapper           memberMapper;
+    private final PerformanceMapper      performanceMapper;
+    private final BCryptPasswordEncoder  passwordEncoder;
 
     // ──────────────────────────────────────────
     // 기획사 가입 신청
     // ──────────────────────────────────────────
 
     @Transactional
-    public void registerPromoter(Map<String, String> body) {
-        String email = body.get("email");
-        if (memberMapper.existsByEmail(email) > 0) {
+    public void registerPromoter(RegisterPromoterCommand command) {
+        if (memberMapper.existsByEmail(command.getEmail()) > 0) {
             throw new BusinessException(ErrorCode.AUTH_EMAIL_DUPLICATE);
         }
 
-        // 1) member 생성 (role=PROMOTER, status=ACTIVE — 샘플이므로 즉시 활성)
         Member member = new Member();
-        member.setEmail(email);
-        member.setPassword(passwordEncoder.encode(body.get("password")));
-        member.setName(body.get("name"));
-        member.setPhone(body.get("phone"));
+        member.setEmail(command.getEmail());
+        member.setPassword(passwordEncoder.encode(command.getPassword()));
+        member.setName(command.getName());
+        member.setPhone(command.getPhone());
         member.setRole("PROMOTER");
         member.setStatus("PENDING_APPROVAL");
         memberMapper.insert(member);
 
-        // 2) promoter 프로필 생성
         Promoter promoter = new Promoter();
         promoter.setMemberId(member.getMemberId());
-        promoter.setCompanyName(body.get("companyName"));
-        promoter.setBusinessRegNo(body.get("businessRegNo"));
-        promoter.setRepresentative(body.get("representative"));
-        promoter.setContactEmail(body.getOrDefault("contactEmail", email));
-        promoter.setContactPhone(body.getOrDefault("contactPhone", body.get("phone")));
-        promoter.setApprovalStatus("PENDING");
+        promoter.setCompanyName(command.getCompanyName());
+        promoter.setBusinessRegNo(command.getBusinessRegNo());
+        promoter.setRepresentative(command.getRepresentative());
+        promoter.setContactEmail(command.getEmail());
+        promoter.setContactPhone(command.getPhone());
+        promoter.setApprovalStatus(PromoterApprovalStatus.PENDING.name());
         promoterMapper.insert(promoter);
 
-        log.info("기획사 가입 신청: email={}, company={}", email, promoter.getCompanyName());
+        log.info("기획사 가입 신청: email={}, company={}", command.getEmail(), command.getCompanyName());
     }
 
     // ──────────────────────────────────────────
@@ -68,40 +70,62 @@ public class PromoterService {
     @Transactional
     public void approvePromoter(Long promoterId, Long adminMemberId) {
         Promoter promoter = getPromoterOrThrow(promoterId);
-        if (!"PENDING".equals(promoter.getApprovalStatus())) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "승인 대기 상태의 기획사만 승인할 수 있습니다.");
-        }
-        promoterMapper.updateApproval(promoterId, "APPROVED", adminMemberId, null);
+        PromoterApprovalStatus current = parseStatus(promoter.getApprovalStatus());
+        validateTransition(current, PromoterApprovalStatus.APPROVED);
+
+        promoterMapper.updateApproval(promoterId, PromoterApprovalStatus.APPROVED.name(), adminMemberId, null);
         memberMapper.updateStatus(promoter.getMemberId(), "ACTIVE");
-        log.info("기획사 승인: promoterId={}, adminMemberId={}", promoterId, adminMemberId);
+        log.info("기획사 승인: promoterId={}, adminMemberId={}, {} → APPROVED", promoterId, adminMemberId, current);
     }
 
     @Transactional
     public void rejectPromoter(Long promoterId, Long adminMemberId, String reason) {
         Promoter promoter = getPromoterOrThrow(promoterId);
-        promoterMapper.updateApproval(promoterId, "REJECTED", adminMemberId, reason);
+        PromoterApprovalStatus current = parseStatus(promoter.getApprovalStatus());
+        validateTransition(current, PromoterApprovalStatus.REJECTED);
+
+        promoterMapper.updateApproval(promoterId, PromoterApprovalStatus.REJECTED.name(), adminMemberId, reason);
         memberMapper.updateStatus(promoter.getMemberId(), "DORMANT");
-        log.info("기획사 반려: promoterId={}, reason={}", promoterId, reason);
+        log.info("기획사 반려: promoterId={}, reason={}, {} → REJECTED", promoterId, reason, current);
     }
 
     @Transactional
     public void suspendPromoter(Long promoterId, Long adminMemberId) {
         Promoter promoter = getPromoterOrThrow(promoterId);
-        promoterMapper.updateApproval(promoterId, "SUSPENDED", adminMemberId, "운영 정지");
+        PromoterApprovalStatus current = parseStatus(promoter.getApprovalStatus());
+        validateTransition(current, PromoterApprovalStatus.SUSPENDED);
+
+        promoterMapper.updateApproval(promoterId, PromoterApprovalStatus.SUSPENDED.name(), adminMemberId, "운영 정지");
         memberMapper.updateStatus(promoter.getMemberId(), "DORMANT");
-        log.info("기획사 정지: promoterId={}", promoterId);
+        log.info("기획사 정지: promoterId={}, {} → SUSPENDED", promoterId, current);
     }
 
     // ──────────────────────────────────────────
-    // 조회
+    // 조회 (typed API)
     // ──────────────────────────────────────────
 
-    public List<Promoter> findByStatus(String status, int page, int size) {
-        int offset = (page - 1) * size;
-        if (status == null || status.isBlank()) {
-            return promoterMapper.findAll(offset, size);
+    public PageResponse<PromoterSummaryDto> searchPromoters(PromoterSearchQuery query) {
+        String status = (query.getStatus() == null || query.getStatus().isBlank()) ? null : query.getStatus();
+        List<Promoter> rows;
+        int total;
+        if (status == null) {
+            rows  = promoterMapper.findAll(query.getOffset(), query.getSize());
+            total = promoterMapper.countAll();
+        } else {
+            rows  = promoterMapper.findByStatus(status, query.getOffset(), query.getSize());
+            total = promoterMapper.countByStatus(status);
         }
-        return promoterMapper.findByStatus(status, offset, size);
+        List<PromoterSummaryDto> content = rows.stream()
+                .map(PromoterSummaryDto::from)
+                .collect(Collectors.toList());
+        return PageResponse.of(content, total, query.getPage(), query.getSize());
+    }
+
+    public List<PromoterSummaryDto> findApprovedSummaries() {
+        return promoterMapper.findByStatus(PromoterApprovalStatus.APPROVED.name(), 0, 200)
+                .stream()
+                .map(PromoterSummaryDto::from)
+                .collect(Collectors.toList());
     }
 
     public int countByStatus(String status) {
@@ -118,13 +142,9 @@ public class PromoterService {
     }
 
     // ──────────────────────────────────────────
-    // 소유권 검증 (PromoterController에서 사용)
+    // 소유권 검증 (Partner 포털에서 사용)
     // ──────────────────────────────────────────
 
-    /**
-     * 해당 공연이 현재 기획사 소유인지 검증.
-     * performance.promoter_id == promoterId 아니면 PERFORMANCE_FORBIDDEN 예외.
-     */
     public void verifyPerformanceOwnership(Long promoterId, Long performanceId) {
         var perf = performanceMapper.findById(performanceId);
         if (perf == null) throw new BusinessException(ErrorCode.PERFORMANCE_NOT_FOUND);
@@ -133,9 +153,28 @@ public class PromoterService {
         }
     }
 
+    // ──────────────────────────────────────────
+    // internal
+    // ──────────────────────────────────────────
+
     private Promoter getPromoterOrThrow(Long promoterId) {
         Promoter p = promoterMapper.findById(promoterId);
         if (p == null) throw new BusinessException(ErrorCode.PROMOTER_NOT_FOUND);
         return p;
+    }
+
+    private PromoterApprovalStatus parseStatus(String raw) {
+        try {
+            return PromoterApprovalStatus.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "알 수 없는 기획사 상태: " + raw);
+        }
+    }
+
+    private void validateTransition(PromoterApprovalStatus current, PromoterApprovalStatus next) {
+        if (!current.canTransitionTo(next)) {
+            throw new BusinessException(ErrorCode.PROMOTER_STATUS_INVALID_TRANSITION,
+                    current.name() + " → " + next.name());
+        }
     }
 }

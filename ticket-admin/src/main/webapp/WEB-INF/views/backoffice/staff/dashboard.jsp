@@ -3,19 +3,19 @@
 <div class="portal-grid stats-4 mb-4">
     <div class="portal-stat">
         <span class="value metric-accent-backoffice">${summary.todayReservations}</span>
-        <span class="label">Today reservations</span>
+        <span class="label">오늘 예약</span>
     </div>
     <div class="portal-stat">
         <span class="value">${summary.todayConfirmedReservations}</span>
-        <span class="label">Today confirmed</span>
+        <span class="label">오늘 확정</span>
     </div>
     <div class="portal-stat">
         <span class="value">${summary.cancelledReservations}</span>
-        <span class="label">Cancelled / refunded</span>
+        <span class="label">취소/환불</span>
     </div>
     <div class="portal-stat">
         <span class="value">${summary.totalMembers}</span>
-        <span class="label">Members in system</span>
+        <span class="label">전체 회원</span>
     </div>
 </div>
 
@@ -23,30 +23,30 @@
     <section class="portal-panel">
         <div class="portal-section-title">
             <div>
-                <h3>Support desk focus</h3>
-                <p>Search reservations, update member status, and resolve issues quickly.</p>
+                <h3>고객지원 대시보드</h3>
+                <p>예약 조회, 회원 상태 변경, 문의 처리를 빠르게 진행하세요.</p>
             </div>
             <div class="d-flex gap-2">
-                <a class="btn btn-primary btn-sm" href="/backoffice/staff/reservation-search">Reservation search</a>
-                <a class="btn btn-outline-secondary btn-sm" href="/backoffice/staff/member-search">Member search</a>
+                <a class="btn btn-primary btn-sm" href="/backoffice/staff/reservation-search">예약 조회</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/backoffice/staff/member-search">회원 조회</a>
             </div>
         </div>
         <div class="portal-note">
-            Staff handles operational recovery and support, while approval and commercial governance stay in the super admin portal.
+            스태프는 운영 복구 및 고객지원을 담당합니다. 승인·정산 등 관리 기능은 최고관리자 포털에서 처리됩니다.
         </div>
     </section>
 
     <section class="portal-panel">
         <div class="portal-section-title">
             <div>
-                <h3>Recent reservations</h3>
-                <p>Latest traffic entering the system</p>
+                <h3>최근 예약</h3>
+                <p>최신 예약 현황</p>
             </div>
         </div>
         <div class="portal-list">
             <c:choose>
                 <c:when test="${empty recentReservations}">
-                    <div class="portal-empty">No reservations yet.</div>
+                    <div class="portal-empty">최근 예약 없음</div>
                 </c:when>
                 <c:otherwise>
                     <c:forEach var="reservation" items="${recentReservations}">

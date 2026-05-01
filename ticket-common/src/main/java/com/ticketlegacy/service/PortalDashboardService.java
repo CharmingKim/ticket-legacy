@@ -95,6 +95,24 @@ public class PortalDashboardService {
         return reservationMapper.searchByKeyword(null, null, 0, limit);
     }
 
+    public Map<String, Object> getSettlementSummary(Long promoterId, String yearMonth) {
+        String ym = normalizeYearMonth(yearMonth);
+        List<Map<String, Object>> rows = portalQueryMapper.findSettlementRows(promoterId, ym);
+        long totalGross    = rows.stream().mapToLong(r -> toLong(r.get("gross_sales"))).sum();
+        long totalFee      = rows.stream().mapToLong(r -> toLong(r.get("platform_fee"))).sum();
+        long totalPayable  = rows.stream().mapToLong(r -> toLong(r.get("payable_amount"))).sum();
+        int  totalRsvCount = rows.stream().mapToInt(r -> toInt(r.get("confirmed_reservations"))).sum();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("rows",          rows);
+        result.put("yearMonth",     ym);
+        result.put("totalGross",    totalGross);
+        result.put("totalFee",      totalFee);
+        result.put("totalPayable",  totalPayable);
+        result.put("totalRsvCount", totalRsvCount);
+        return result;
+    }
+
     public String defaultYearMonth() {
         return YearMonth.now().format(YEAR_MONTH_FORMAT);
     }
@@ -107,13 +125,15 @@ public class PortalDashboardService {
     }
 
     private int toInt(Object value) {
-        if (value == null) {
-            return 0;
-        }
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        return Integer.parseInt(value.toString());
+        if (value == null) return 0;
+        if (value instanceof Number) return ((Number) value).intValue();
+        try { return Integer.parseInt(value.toString()); } catch (Exception e) { return 0; }
+    }
+
+    private long toLong(Object value) {
+        if (value == null) return 0L;
+        if (value instanceof Number) return ((Number) value).longValue();
+        try { return Long.parseLong(value.toString()); } catch (Exception e) { return 0L; }
     }
 
     private int metric(Map<String, Object> source, String... keys) {

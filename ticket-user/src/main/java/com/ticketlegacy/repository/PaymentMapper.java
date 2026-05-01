@@ -9,9 +9,9 @@ import java.util.List;
 public interface PaymentMapper {
     int insert(Payment payment);
     Payment findByIdempotencyKey(@Param("idempotencyKey") String key);
-    int updateCompleted(@Param("paymentId") Long paymentId,
+    int updateCompleted(@Param("id") Long id,
                         @Param("pgTransactionId") String pgTxId);
-    int updateFailed(@Param("paymentId") Long paymentId,
-                     @Param("failureReason") String reason);
-    List<Payment> findStalePending(@Param("minutesAgo") int minutesAgo);
+    int updateFailed(@Param("id") Long id,
+                     @Param("failReason") String reason);
+    List<Payment> findStalePending(@Param("minutes") int minutes);
 }

@@ -1,6 +1,7 @@
 package com.ticketlegacy.service;
 
 import com.ticketlegacy.domain.Payment;
+import com.ticketlegacy.domain.Reservation;
 import com.ticketlegacy.dto.request.PaymentRequest;
 import com.ticketlegacy.exception.BusinessException;
 import com.ticketlegacy.exception.ErrorCode;
@@ -28,6 +29,19 @@ public class PaymentService {
 
     @Transactional(isolation = Isolation.REPEATABLE_READ, rollbackFor = Exception.class)
     public Payment processPayment(PaymentRequest request, Long memberId) {
+        Reservation reservation = reservationMapper.findById(request.getReservationId());
+        if (reservation == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "예약을 찾을 수 없습니다.");
+        }
+        if (!memberId.equals(reservation.getMemberId())) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN, "본인 예약만 결제할 수 있습니다.");
+        }
+        if (!"PENDING".equals(reservation.getStatus())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "결제 가능한 예약 상태가 아닙니다. (현재: " + reservation.getStatus() + ")");
+        }
+        int baseAmount = reservation.getTotalAmount();
+
         String idempotencyKey = IdempotencyKeyGenerator.generate(
                 memberId, request.getScheduleId(), request.getSeatIds());
 
@@ -44,15 +58,20 @@ public class PaymentService {
 
         int discountAmount = 0;
         if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
-            discountAmount = couponService.validateAndCalculateDiscount(request.getCouponCode(), request.getAmount());
-            request.setAmount(Math.max(0, request.getAmount() - discountAmount));
+            discountAmount = couponService.validateAndCalculateDiscount(request.getCouponCode(), baseAmount);
         }
+        int finalAmount = Math.max(0, baseAmount - discountAmount);
+        request.setAmount(finalAmount);
 
         Payment payment = new Payment();
         payment.setReservationId(request.getReservationId());
+        payment.setMemberId(memberId);
         payment.setIdempotencyKey(idempotencyKey);
-        payment.setAmount(request.getAmount());
+        payment.setAmount(baseAmount);
+        payment.setDiscountAmount(discountAmount);
+        payment.setFinalAmount(finalAmount);
         payment.setMethod(request.getMethod());
+        payment.setStatus("PENDING");
         paymentMapper.insert(payment);
 
         boolean pgSuccess = simulatePgPayment(request);
@@ -61,7 +80,7 @@ public class PaymentService {
         if (pgSuccess) {
             String pgTxId = "PG-" + System.currentTimeMillis();
             try {
-                paymentMapper.updateCompleted(payment.getPaymentId(), pgTxId);
+                paymentMapper.updateCompleted(payment.getId(), pgTxId);
                 seatInventoryMapper.updateToReserved(request.getScheduleId(), request.getSeatIds(), memberId);
                 reservationMapper.updateConfirmed(request.getReservationId());
                 scheduleMapper.decreaseAvailableSeats(request.getScheduleId(), request.getSeatIds().size());
@@ -80,7 +99,7 @@ public class PaymentService {
                 }
 
                 log.info("결제 완료: paymentId={}, reservationId={}, amount={}",
-                        payment.getPaymentId(), request.getReservationId(), request.getAmount());
+                        payment.getId(), request.getReservationId(), finalAmount);
                 payment.setStatus("COMPLETED");
                 payment.setPgTransactionId(pgTxId);
             } catch (Exception e) {
@@ -88,7 +107,7 @@ public class PaymentService {
                 throw new PaymentFailedException("결제 확정 실패", e);
             }
         } else {
-            paymentMapper.updateFailed(payment.getPaymentId(), "PG사 결제 거절");
+            paymentMapper.updateFailed(payment.getId(), "PG사 결제 거절");
             reservationMapper.updateStatus(request.getReservationId(), "CANCELLED");
             for (Long seatId : request.getSeatIds()) {
                 try { redisTemplate.opsForHash().delete(hashKey, String.valueOf(seatId)); }

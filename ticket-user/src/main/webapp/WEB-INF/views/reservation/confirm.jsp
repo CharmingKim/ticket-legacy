@@ -34,7 +34,7 @@
             </div>
             <div class="tl-confirm-row">
                 <span class="label">장소</span>
-                <span class="value">${not empty schedule.venueName ? schedule.venueName : '장소 미정'}</span>
+                <span class="value">${not empty schedule.venue ? schedule.venue : '장소 미정'}</span>
             </div>
         </div>
 
@@ -58,13 +58,33 @@
                 <select id="couponSelect" class="tl-form-control">
                     <option value="">쿠폰 없음</option>
                     <c:forEach var="c" items="${coupons}">
-                        <option value="${c.couponId}" data-discount="${c.discountAmount}">
-                            ${c.couponName} (${c.discountAmount}원 할인)
+                        <option value="${c.couponCode}"
+                                data-discount-type="${c.discountType}"
+                                data-discount-value="${c.discountValue}"
+                                data-max-discount="${c.maxDiscount}"
+                                data-min-amount="${c.minAmount}"
+                                <c:if test="${c.minAmount > totalAmount}">disabled</c:if>>
+                            ${c.couponName} (${c.discountText} 할인<c:if test="${c.minAmount > 0}">, 최소 <fmt:formatNumber value="${c.minAmount}" type="number"/>원~</c:if>)<c:if test="${c.minAmount > totalAmount}"> — 사용 불가</c:if>
                         </option>
                     </c:forEach>
                 </select>
             </div>
         </c:if>
+
+        <!-- Payment Method -->
+        <div class="tl-confirm-section">
+            <div class="fw-700 mb-3" style="font-size:.95rem">결제수단</div>
+            <div class="d-flex gap-2">
+                <label class="tl-pay-method flex-fill">
+                    <input type="radio" name="paymentMethod" value="CARD" checked>
+                    <i class="bi bi-credit-card-2-front me-2"></i>신용카드
+                </label>
+                <label class="tl-pay-method flex-fill">
+                    <input type="radio" name="paymentMethod" value="BANK_TRANSFER">
+                    <i class="bi bi-bank me-2"></i>계좌이체
+                </label>
+            </div>
+        </div>
 
         <!-- Price Summary -->
         <div class="tl-confirm-section">
@@ -111,11 +131,25 @@ let baseAmount    = ${totalAmount != null ? totalAmount : 0};
 let discountAmt   = 0;
 let selectedCouponId = null;
 
+let selectedCouponCode = null;
+
+function calcDiscount(opt, base) {
+    const type = opt.data('discount-type');
+    const val  = parseInt(opt.data('discount-value') || 0);
+    const max  = parseInt(opt.data('max-discount')   || 0);
+    if (!type || !val) return 0;
+    if (type === 'PERCENT') {
+        const d = Math.round(base * val / 100);
+        return max > 0 ? Math.min(d, max) : d;
+    }
+    return Math.min(val, base);
+}
+
 $('#couponSelect').on('change', function() {
-    const opt = $(this).find(':selected');
-    discountAmt      = parseInt(opt.data('discount') || 0);
-    selectedCouponId = $(this).val() || null;
-    const final      = Math.max(0, baseAmount - discountAmt);
+    const opt          = $(this).find(':selected');
+    selectedCouponCode = $(this).val() || null;
+    discountAmt        = selectedCouponCode ? calcDiscount(opt, baseAmount) : 0;
+    const finalAmt     = Math.max(0, baseAmount - discountAmt);
 
     if (discountAmt > 0) {
         $('#discountRow').show();
@@ -123,32 +157,66 @@ $('#couponSelect').on('change', function() {
     } else {
         $('#discountRow').hide();
     }
-    $('#finalAmount').text(final.toLocaleString() + '원');
+    $('#finalAmount').text(finalAmt.toLocaleString() + '원');
 });
 
+function restorePayBtn() {
+    $('#payBtn').prop('disabled', false).html('<i class="bi bi-credit-card me-2"></i>결제하기');
+}
+
 $('#payBtn').on('click', function() {
-    $(this).prop('disabled', true).html('<span class="tl-spinner" style="width:20px;height:20px;border-width:2px"></span>');
+    const $btn = $(this);
+    const seatIdList = seatIds.split(',').map(Number);
+    const finalAmt   = Math.max(0, baseAmount - discountAmt);
+    const method     = $('input[name="paymentMethod"]:checked').val();
 
-    const payload = {
+    if (!method) { toast.warning('결제수단을 선택해주세요.'); return; }
+
+    $btn.prop('disabled', true).html('<span class="tl-spinner" style="width:20px;height:20px;border-width:2px"></span>');
+
+    // Step 1: 예약 생성 (PENDING)
+    api.post(ctx + '/api/reservation/create', {
         scheduleId:  parseInt(scheduleId),
-        seatIds:     seatIds.split(',').map(Number),
-        couponId:    selectedCouponId ? parseInt(selectedCouponId) : null
-    };
+        seatIds:     seatIdList,
+        totalAmount: baseAmount
+    })
+    .done(function(res) {
+        if (!res.success || !res.data || !res.data.reservationId) {
+            toast.error(res.message || '예약 생성에 실패했습니다.');
+            restorePayBtn();
+            return;
+        }
+        const reservationId = res.data.reservationId;
 
-    api.post(ctx + '/api/payment/process', payload)
-        .done(function(res) {
-            if (res.success) {
+        // Step 2: 결제 처리 (CONFIRMED)
+        // amount는 표시용일 뿐 — 서버가 reservation.totalAmount 기준으로 재계산
+        api.post(ctx + '/api/payment/process', {
+            reservationId: reservationId,
+            scheduleId:    parseInt(scheduleId),
+            seatIds:       seatIdList,
+            method:        method,
+            amount:        baseAmount,
+            couponCode:    selectedCouponCode
+        })
+        .done(function(res2) {
+            if (res2.success) {
                 toast.success('결제가 완료되었습니다!');
                 setTimeout(() => { location.href = ctx + '/reservation/history'; }, 1500);
             } else {
-                toast.error(res.message || '결제에 실패했습니다.');
-                $('#payBtn').prop('disabled', false).html('<i class="bi bi-credit-card me-2"></i>결제하기');
+                toast.error(res2.message || '결제에 실패했습니다.');
+                restorePayBtn();
             }
         })
         .fail(function(xhr) {
-            const msg = xhr.responseJSON?.message || '결제 처리 중 오류가 발생했습니다.';
+            const msg = (xhr.responseJSON && xhr.responseJSON.message) || '결제 처리 중 오류가 발생했습니다.';
             toast.error(msg);
-            $('#payBtn').prop('disabled', false).html('<i class="bi bi-credit-card me-2"></i>결제하기');
+            restorePayBtn();
         });
+    })
+    .fail(function(xhr) {
+        const msg = (xhr.responseJSON && xhr.responseJSON.message) || '예약 생성 중 오류가 발생했습니다.';
+        toast.error(msg);
+        restorePayBtn();
+    });
 });
 </script>

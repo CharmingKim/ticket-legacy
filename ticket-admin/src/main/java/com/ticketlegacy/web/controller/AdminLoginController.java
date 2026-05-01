@@ -45,7 +45,7 @@ public class AdminLoginController {
                     .body(ApiResponse.error("관리자 계정이 아닙니다."));
         }
 
-        Cookie cookie = new Cookie("ACCESS_TOKEN", result.token);
+        Cookie cookie = new Cookie("ADMIN_TOKEN", result.token);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60 * 2); // 2시간
@@ -62,7 +62,7 @@ public class AdminLoginController {
     @PostMapping("/api/logout")
     @ResponseBody
     public ResponseEntity<ApiResponse<?>> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie("ACCESS_TOKEN", "");
+        Cookie cookie = new Cookie("ADMIN_TOKEN", "");
         cookie.setMaxAge(0);
         cookie.setPath("/");
         response.addCookie(cookie);

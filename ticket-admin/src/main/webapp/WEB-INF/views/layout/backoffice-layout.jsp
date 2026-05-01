@@ -2,7 +2,7 @@
 <%@ taglib prefix="tiles" uri="http://tiles.apache.org/tags-tiles" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,14 +25,20 @@
     <div class="portal-main">
         <header class="portal-topbar">
             <div>
-                <p class="portal-kicker">Backoffice</p>
+                <p class="portal-kicker">백오피스</p>
                 <h1 class="portal-title">TicketLegacy HQ</h1>
             </div>
             <div class="portal-actions">
-                <span class="portal-chip">${loginRole}</span>
+                <span class="portal-chip">
+                    <c:choose>
+                        <c:when test="${loginRole == 'SUPER_ADMIN'}">최고관리자</c:when>
+                        <c:when test="${loginRole == 'STAFF'}">스태프</c:when>
+                        <c:otherwise>${loginRole}</c:otherwise>
+                    </c:choose>
+                </span>
                 <span class="text-muted small">${loginEmail}</span>
-                <a class="btn btn-outline-secondary btn-sm" href="http://localhost:8080/" target="_blank">Public Site</a>
-                <a class="btn btn-dark btn-sm" href="#" id="btnLogout">Logout</a>
+                <a class="btn btn-outline-secondary btn-sm" href="http://localhost:8080/" target="_blank">공개 사이트</a>
+                <a class="btn btn-dark btn-sm" href="#" id="btnLogout">로그아웃</a>
             </div>
         </header>
         <main class="portal-content">

@@ -1,16 +1,23 @@
 package com.ticketlegacy.web.controller;
 
-import com.ticketlegacy.domain.Member;
 import com.ticketlegacy.domain.Reservation;
-import com.ticketlegacy.repository.MemberMapper;
-import com.ticketlegacy.repository.ReservationMapper;
+import com.ticketlegacy.exception.BusinessException;
+import com.ticketlegacy.exception.ErrorCode;
+import com.ticketlegacy.dto.request.MemberSearchQuery;
+import com.ticketlegacy.dto.request.MemberStatusCommand;
+import com.ticketlegacy.dto.response.ApiResponse;
+import com.ticketlegacy.dto.response.MemberSummaryDto;
+import com.ticketlegacy.dto.response.PageResponse;
+import com.ticketlegacy.service.MemberService;
 import com.ticketlegacy.service.PortalDashboardService;
 import com.ticketlegacy.service.ReservationService;
+import com.ticketlegacy.web.support.AuthMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import javax.validation.Valid;
 import java.util.List;
 import java.util.Map;
 
@@ -27,9 +35,8 @@ import java.util.Map;
 public class BackofficeStaffController {
 
     private final PortalDashboardService portalDashboardService;
-    private final ReservationMapper reservationMapper;
-    private final MemberMapper memberMapper;
-    private final ReservationService reservationService;
+    private final MemberService          memberService;
+    private final ReservationService     reservationService;
 
     @GetMapping("/dashboard")
     public String dashboard(Model model) {
@@ -60,15 +67,15 @@ public class BackofficeStaffController {
                                                 @RequestParam(required = false) String status,
                                                 @RequestParam(defaultValue = "1") int page) {
         int pageSize = 20;
-        List<Reservation> list = reservationMapper.searchByKeyword(keyword, status, (page - 1) * pageSize, pageSize);
-        int total = reservationMapper.countByKeyword(keyword, status);
+        List<Reservation> list = reservationService.searchReservations(keyword, status, page, pageSize);
+        int total = reservationService.countReservations(keyword, status);
         return ResponseEntity.ok(Map.of("list", list, "total", total, "page", page));
     }
 
     @GetMapping("/api/reservations/{reservationId}")
     @ResponseBody
     public ResponseEntity<?> reservationDetail(@PathVariable Long reservationId) {
-        return ResponseEntity.ok(reservationMapper.findById(reservationId));
+        return ResponseEntity.ok(reservationService.findById(reservationId));
     }
 
     @PostMapping("/api/reservations/{reservationId}/cancel")
@@ -80,21 +87,21 @@ public class BackofficeStaffController {
 
     @GetMapping("/api/members")
     @ResponseBody
-    public ResponseEntity<?> searchMembers(@RequestParam(required = false) String role,
-                                           @RequestParam(required = false) String status,
-                                           @RequestParam(required = false) String keyword,
-                                           @RequestParam(defaultValue = "1") int page) {
-        int pageSize = 20;
-        List<Member> list = memberMapper.findAll(role, status, keyword, (page - 1) * pageSize, pageSize);
-        int total = memberMapper.countFiltered(role, status, keyword);
-        return ResponseEntity.ok(Map.of("list", list, "total", total, "page", page));
+    public ResponseEntity<ApiResponse<PageResponse<MemberSummaryDto>>> searchMembers(
+            @Valid @ModelAttribute MemberSearchQuery query) {
+        return ResponseEntity.ok(ApiResponse.success(memberService.searchMembers(query)));
     }
 
     @PostMapping("/api/members/{memberId}/status")
     @ResponseBody
-    public ResponseEntity<?> updateMemberStatus(@PathVariable Long memberId,
-                                                @RequestBody Map<String, String> body) {
-        memberMapper.updateStatus(memberId, body.get("status"));
-        return ResponseEntity.ok(Map.of("message", "Member status updated."));
+    public ResponseEntity<ApiResponse<Void>> updateMemberStatus(
+            @PathVariable Long memberId,
+            @Valid @RequestBody MemberStatusCommand command,
+            @AuthMember Long adminMemberId) {
+        if (memberId.equals(adminMemberId)) {
+            throw new BusinessException(ErrorCode.MEMBER_CANNOT_MODIFY_SELF);
+        }
+        memberService.updateAdminStatus(memberId, command.getStatus(), adminMemberId, command.getReason());
+        return ResponseEntity.ok(ApiResponse.successMessage("회원 상태가 변경되었습니다."));
     }
 }

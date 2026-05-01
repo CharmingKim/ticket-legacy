@@ -53,7 +53,16 @@ public class PartnerPromoterController {
 
     private Long currentPromoterId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return ((LoginUser) auth.getPrincipal()).getPromoterId();
+        if (auth == null || !(auth.getPrincipal() instanceof LoginUser)) {
+            throw new com.ticketlegacy.exception.BusinessException(
+                    com.ticketlegacy.exception.ErrorCode.AUTH_FORBIDDEN, "파트너 인증이 필요합니다.");
+        }
+        Long promoterId = ((LoginUser) auth.getPrincipal()).getPromoterId();
+        if (promoterId == null) {
+            throw new com.ticketlegacy.exception.BusinessException(
+                    com.ticketlegacy.exception.ErrorCode.AUTH_FORBIDDEN, "기획사 계정이 아닙니다.");
+        }
+        return promoterId;
     }
 
     @GetMapping("/dashboard")

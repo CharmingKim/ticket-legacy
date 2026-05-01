@@ -23,6 +23,7 @@ public class NoticeService {
         return notice;
     }
 
+    @Transactional
     public Notice findById(Long noticeId) {
         Notice n = noticeMapper.findById(noticeId);
         if (n == null) throw new BusinessException(ErrorCode.INVALID_INPUT, "공지사항을 찾을 수 없습니다.");

@@ -1,8 +1,11 @@
 package com.ticketlegacy.web.controller;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -16,19 +19,51 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import com.ticketlegacy.domain.Coupon;
 import com.ticketlegacy.domain.Reservation;
+import com.ticketlegacy.domain.Schedule;
+import com.ticketlegacy.domain.SeatInventory;
 import com.ticketlegacy.dto.response.ApiResponse;
+import com.ticketlegacy.repository.ScheduleMapper;
+import com.ticketlegacy.repository.SeatInventoryMapper;
+import com.ticketlegacy.service.CouponService;
 import com.ticketlegacy.service.ReservationService;
 
 @Controller
 public class ReservationController {
 
     @Autowired private ReservationService reservationService;
+    @Autowired private ScheduleMapper scheduleMapper;
+    @Autowired private SeatInventoryMapper seatInventoryMapper;
+    @Autowired private CouponService couponService;
 
-    @GetMapping("/reservation/confirm/{reservationId}")
-    public String confirmPage(@PathVariable Long reservationId, Model model) {
-        Reservation reservation = reservationService.findById(reservationId);
-        model.addAttribute("reservation", reservation);
+    @GetMapping("/reservation/confirm")
+    public String confirmPage(@RequestParam Long scheduleId,
+                               @RequestParam String seatIds,
+                               HttpServletRequest request, Model model) {
+        Long memberId = (Long) request.getAttribute("loginMemberId");
+
+        List<Long> seatIdList = Arrays.stream(seatIds.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+
+        Schedule schedule = scheduleMapper.findById(scheduleId);
+        List<SeatInventory> seats = seatIdList.isEmpty()
+                ? Collections.emptyList()
+                : seatInventoryMapper.findByScheduleAndSeatIds(scheduleId, seatIdList);
+        int totalAmount = seats.stream().mapToInt(SeatInventory::getPrice).sum();
+        List<Coupon> coupons = memberId != null
+                ? couponService.findByMemberId(memberId)
+                : Collections.emptyList();
+
+        model.addAttribute("schedule", schedule);
+        model.addAttribute("seats", seats);
+        model.addAttribute("totalAmount", totalAmount);
+        model.addAttribute("coupons", coupons);
+        model.addAttribute("scheduleId", scheduleId);
+        model.addAttribute("seatIds", seatIds);
         return "reservation/confirm";
     }
 

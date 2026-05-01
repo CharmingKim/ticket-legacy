@@ -43,7 +43,7 @@ public class BackofficeCouponController {
     @GetMapping("/coupons")
     public String couponPage(Model model) {
         model.addAttribute("templates", couponService.findAllTemplates(null, null));
-        model.addAttribute("promoters", promoterService.findByStatus("APPROVED", 1, 100));
+        model.addAttribute("promoters", promoterService.findApprovedSummaries());
         return "backoffice/super/coupons";
     }
 

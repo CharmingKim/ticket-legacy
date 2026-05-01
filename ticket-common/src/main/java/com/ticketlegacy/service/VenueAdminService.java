@@ -3,9 +3,13 @@ package com.ticketlegacy.service;
 import com.ticketlegacy.domain.Venue;
 import com.ticketlegacy.domain.VenueSection;
 import com.ticketlegacy.domain.VenueSeatTemplate;
+import com.ticketlegacy.domain.VenueStageConfig;
+import com.ticketlegacy.domain.VenueStageSection;
 import com.ticketlegacy.repository.VenueMapper;
 import com.ticketlegacy.repository.VenueSectionMapper;
 import com.ticketlegacy.repository.VenueSeatTemplateMapper;
+import com.ticketlegacy.repository.VenueStageConfigMapper;
+import com.ticketlegacy.repository.VenueStageSectionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,8 @@ public class VenueAdminService {
     private final VenueMapper venueMapper;
     private final VenueSectionMapper venueSectionMapper;
     private final VenueSeatTemplateMapper venueSeatTemplateMapper;
+    private final VenueStageConfigMapper venueStageConfigMapper;
+    private final VenueStageSectionMapper venueStageSectionMapper;
 
     /** 공연장 등록 */
     @Transactional
@@ -132,5 +138,47 @@ public class VenueAdminService {
     /** 공연장별 템플릿 좌석 수 조회 */
     public int getTemplateCount(Long venueId) {
         return venueSeatTemplateMapper.countByVenueId(venueId);
+    }
+
+    // ─────────────────────────────────────────────
+    // 무대구성(StageConfig) 관리
+    // ─────────────────────────────────────────────
+
+    public List<VenueStageConfig> findStageConfigs(Long venueId) {
+        return venueStageConfigMapper.findByVenueId(venueId);
+    }
+
+    @Transactional
+    public VenueStageConfig createStageConfig(Long venueId, String configName,
+                                               String description, boolean isDefault) {
+        VenueStageConfig config = new VenueStageConfig();
+        config.setVenueId(venueId);
+        config.setConfigName(configName);
+        config.setDescription(description);
+        config.setDefaultConfig(isDefault);
+        venueStageConfigMapper.insert(config);
+        log.info("무대구성 등록: configId={}, venueId={}, name={}", config.getConfigId(), venueId, configName);
+        return config;
+    }
+
+    @Transactional
+    public void deleteStageConfig(Long configId) {
+        venueStageConfigMapper.deleteById(configId);
+        log.info("무대구성 삭제: configId={}", configId);
+    }
+
+    // ─────────────────────────────────────────────
+    // 무대구성 구역(StageSection) 관리
+    // ─────────────────────────────────────────────
+
+    public List<VenueStageSection> findStageSections(Long configId) {
+        return venueStageSectionMapper.findByConfigId(configId);
+    }
+
+    @Transactional
+    public void upsertStageSection(VenueStageSection stageSection) {
+        venueStageSectionMapper.upsert(stageSection);
+        log.info("무대구성 구역 저장: configId={}, sectionId={}, active={}",
+                stageSection.getConfigId(), stageSection.getSectionId(), stageSection.isActive());
     }
 }

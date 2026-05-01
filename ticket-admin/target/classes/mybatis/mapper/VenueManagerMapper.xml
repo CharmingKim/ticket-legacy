@@ -63,6 +63,23 @@
         WHERE approval_status = #{status}
     </select>
 
+    <select id="findAll" resultMap="vmMap">
+        SELECT vm.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone,
+               v.name  AS venue_name
+        FROM venue_manager vm
+        JOIN member m ON vm.member_id = m.member_id
+        JOIN venue  v ON vm.venue_id  = v.venue_id
+        ORDER BY vm.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM venue_manager
+    </select>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="managerId">
         INSERT INTO venue_manager (
             member_id, venue_id, department, position, approval_status

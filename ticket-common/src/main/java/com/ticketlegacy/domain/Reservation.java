@@ -34,4 +34,8 @@ public class Reservation {
     private String paymentStatus;
     private String paymentMethod;
     private LocalDateTime checkedInAt;
+
+    public LocalDateTime getScheduleDatetime() {
+        return (showDate != null && showTime != null) ? showDate.atTime(showTime) : null;
+    }
 }

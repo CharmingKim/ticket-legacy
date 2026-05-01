@@ -65,6 +65,14 @@ ticket-user ↔ ticket-partner ↔ ticket-admin 간 직접 의존 없음. 공유
 
 3개 서버가 동일한 `JWT_SECRET_KEY`로 서명·검증. 사용자가 ticket-user에서 발급받은 JWT를 ticket-partner에서는 사용 불가 — 역할(role) 기반으로 각 포털의 `security-context.xml`에서 차단.
 
+## 코드 변경 전 전수 검색 필수
+
+`ticket-common`의 Service 메서드를 **제거하거나 시그니처를 변경**하기 전에 반드시 3개 WAR 전체에서 해당 메서드명을 검색해 모든 호출처를 확인한다.
+
+- `ticket-common` Service는 `ticket-user` · `ticket-partner` · `ticket-admin` 셋 다 의존
+- 한 WAR에서만 확인하면 나머지 WAR에서 컴파일 에러 발생
+- 검색 범위: 프로젝트 루트 전체 (`ticket-admin/`, `ticket-partner/`, `ticket-user/` 포함)
+
 ## 테스트 계정
 
 | 계정 | 비밀번호 | 포털 |

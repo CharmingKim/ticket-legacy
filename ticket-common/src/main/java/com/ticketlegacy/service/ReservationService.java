@@ -88,21 +88,22 @@ public class ReservationService {
             throw new BusinessException(ErrorCode.RESERVATION_CANCEL_FAILED, "취소할 수 없는 상태입니다.");
         }
 
-        // 1. 예약 상태 CANCELLED
+        String prevStatus = reservation.getStatus();
         reservationMapper.updateStatus(reservationId, "CANCELLED");
 
-        // 2. 좌석 인벤토리 RESERVED → AVAILABLE 복구
         List<Long> seatIds = reservation.getSeats().stream()
                 .map(com.ticketlegacy.domain.ReservationSeat::getSeatId)
                 .collect(Collectors.toList());
 
-        if (!seatIds.isEmpty()) {
+        // CONFIRMED만 좌석 인벤토리/카운터 복구.
+        // PENDING은 아직 좌석이 RESERVED 되지도, available_seats 가 감소되지도 않았음.
+        if (!seatIds.isEmpty() && "CONFIRMED".equals(prevStatus)) {
             seatInventoryMapper.releaseReservedSeats(reservation.getScheduleId(), seatIds);
-
-            // 3. schedule available_seats 복구
             scheduleMapper.increaseAvailableSeats(reservation.getScheduleId(), seatIds.size());
+        }
 
-            // 4. Redis에서 해당 좌석 RESERVED 상태 제거 → 다른 사람이 선점 가능
+        // Redis hold 는 상태 무관하게 해제 (다음 사용자가 선점 가능하도록)
+        if (!seatIds.isEmpty()) {
             String hashKey = "schedule:" + reservation.getScheduleId() + ":seat_status";
             for (Long seatId : seatIds) {
                 try {
@@ -113,7 +114,39 @@ public class ReservationService {
             }
         }
 
-        log.info("예약 취소 완료: reservationId={}, 복구 좌석 수={}", reservationId, seatIds.size());
+        log.info("예약 취소 완료: reservationId={}, prevStatus={}, 좌석 수={}",
+                reservationId, prevStatus, seatIds.size());
+    }
+
+    /** 결제 실패 시 컨트롤러에서 호출하는 시스템 취소 — 멤버 소유권 검사 없음 */
+    @Transactional
+    public void cancelOrphan(Long reservationId) {
+        Reservation reservation = reservationMapper.findById(reservationId);
+        if (reservation == null) return;
+        if (!"PENDING".equals(reservation.getStatus())) return;
+
+        reservationMapper.updateStatus(reservationId, "CANCELLED");
+
+        List<Long> seatIds = new java.util.ArrayList<>();
+        if (reservation.getSeats() != null) {
+            for (ReservationSeat rs : reservation.getSeats()) {
+                if (rs.getSeatId() != null) seatIds.add(rs.getSeatId());
+            }
+        }
+
+        if (!seatIds.isEmpty()) {
+            String hashKey = "schedule:" + reservation.getScheduleId() + ":seat_status";
+            for (Long seatId : seatIds) {
+                try {
+                    if (redisTemplate != null) {
+                        redisTemplate.opsForHash().delete(hashKey, String.valueOf(seatId));
+                    }
+                } catch (Exception e) {
+                    log.warn("orphan 취소 후 Redis 좌석 상태 제거 실패: seatId={}", seatId);
+                }
+            }
+        }
+        log.info("결제 실패로 인한 orphan 예약 자동 취소: reservationId={}", reservationId);
     }
 
     @Transactional
@@ -123,16 +156,19 @@ public class ReservationService {
             throw new BusinessException(ErrorCode.RESERVATION_CANCEL_FAILED, "Only pending or confirmed reservations can be cancelled.");
         }
 
+        String prevStatus = reservation.getStatus();
         reservationMapper.updateStatus(reservationId, "CANCELLED");
 
         List<Long> seatIds = reservation.getSeats().stream()
                 .map(com.ticketlegacy.domain.ReservationSeat::getSeatId)
                 .collect(Collectors.toList());
 
-        if (!seatIds.isEmpty()) {
+        if (!seatIds.isEmpty() && "CONFIRMED".equals(prevStatus)) {
             seatInventoryMapper.releaseReservedSeats(reservation.getScheduleId(), seatIds);
             scheduleMapper.increaseAvailableSeats(reservation.getScheduleId(), seatIds.size());
+        }
 
+        if (!seatIds.isEmpty()) {
             String hashKey = "schedule:" + reservation.getScheduleId() + ":seat_status";
             for (Long seatId : seatIds) {
                 try {
@@ -143,8 +179,8 @@ public class ReservationService {
             }
         }
 
-        log.info("Operator cancellation completed: reservationId={}, restoredSeats={}",
-                reservationId, seatIds.size());
+        log.info("Operator cancellation completed: reservationId={}, prevStatus={}, seats={}",
+                reservationId, prevStatus, seatIds.size());
     }
 
     // Redis 없는 프로젝트(ticket-admin)에서도 컴파일·구동 가능하도록 required=false.
@@ -184,5 +220,17 @@ public class ReservationService {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String uid = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         return "TL-" + date + "-" + uid;
+    }
+
+    // ──────────────────────────────────────────
+    // 관리자 전용 — 예약 검색 (staff)
+    // ──────────────────────────────────────────
+
+    public List<Reservation> searchReservations(String keyword, String status, int page, int pageSize) {
+        return reservationMapper.searchByKeyword(keyword, status, (page - 1) * pageSize, pageSize);
+    }
+
+    public int countReservations(String keyword, String status) {
+        return reservationMapper.countByKeyword(keyword, status);
     }
 }

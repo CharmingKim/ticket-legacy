@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn -q -pl ticket-common,ticket-user,ticket-partner,ticket-admin compile -am)",
+      "Bash(where mvn *)",
+      "Bash(where mvn.cmd)",
+      "Read(//c/Users/green/.m2/**)",
+      "Bash(mvn -q -pl ticket-admin -am compile)",
+      "Bash(python *)",
+      "Bash(mysql --version)",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -uroot -p1234 -e \"SELECT VERSION\\(\\);\")",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -uroot -p1234)",
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -uroot -p1234 springgreen6 -e ' *)",
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' --default-character-set=utf8mb4 -uroot -p1234 springgreen6 -e ' *)",
+      "Bash(javap -v ticket-user/target/classes/com/ticketlegacy/web/controller/QueueController.class)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 14288\" /V)",
+      "Bash(wmic process *)",
+      "Bash(powershell *)",
+      "Bash(javap ticket-user/target/classes/com/ticketlegacy/web/controller/ReservationController.class)",
+      "Read(//d/springGreen/springframework/works/.metadata/.plugins/org.eclipse.wst.server.core/tmp3/wtpwebapps/ticket-user/WEB-INF/views/reservation/**)",
+      "Bash(bash deploy-sync.sh user)",
+      "Bash(mvn -q -pl ticket-user -am compile)",
+      "Bash(mvn -pl ticket-common -am clean install -DskipTests -q)",
+      "Bash(javac -encoding UTF-8 -source 11 -target 11 -d D:/springGreen/springframework/works/ticket-parent/ticket-common/target/classes -cp 'C:/Users/green/.m2/repository/org/projectlombok/lombok/1.18.32/lombok-1.18.32.jar;D:/springGreen/springframework/works/ticket-parent/ticket-common/target/classes' D:/springGreen/springframework/works/ticket-parent/ticket-common/src/main/java/com/ticketlegacy/domain/Coupon.java)",
+      "Bash(mvn clean *)",
+      "PowerShell(Get-ChildItem C:\\\\Users\\\\green -Force -ErrorAction SilentlyContinue | Select-Object Name, FullName | Where-Object {$_.Name -match 'm2|maven|java|jdk'})",
+      "Bash(mvn.cmd clean *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(netstat *)",
+      "Bash(bash deploy-sync.sh all)",
+      "Bash(bash deploy-sync.sh partner)"
+    ]
+  }
+}

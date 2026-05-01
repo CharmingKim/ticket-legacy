@@ -64,13 +64,18 @@
     <task:executor id="asyncExecutor" pool-size="5-20" queue-capacity="100" rejection-policy="CALLER_RUNS" />
     <task:scheduler id="taskScheduler" pool-size="3" />
 
-    <!-- Jackson ObjectMapper — Spring FactoryBean으로 JavaTimeModule 등록 -->
+    <!-- Jackson ObjectMapper — JavaTimeModule + ISO 문자열 직렬화 -->
     <bean id="objectMapper"
           class="org.springframework.http.converter.json.Jackson2ObjectMapperFactoryBean">
         <property name="modulesToInstall">
             <list>
                 <value>com.fasterxml.jackson.datatype.jsr310.JavaTimeModule</value>
             </list>
+        </property>
+        <property name="featuresToDisable">
+            <array>
+                <value>#{T(com.fasterxml.jackson.databind.SerializationFeature).WRITE_DATES_AS_TIMESTAMPS}</value>
+            </array>
         </property>
     </bean>
 

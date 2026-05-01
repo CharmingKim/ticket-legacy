@@ -36,6 +36,9 @@
 
   <!-- 빠른 링크 -->
   <div class="d-flex flex-wrap gap-2 mb-4">
+    <a href="/backoffice/super/member-list" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-people me-1"></i>회원 관리
+    </a>
     <a href="/backoffice/super/settlement" class="btn btn-outline-primary btn-sm">
       <i class="bi bi-cash-stack me-1"></i>정산 관리
     </a>
@@ -95,10 +98,13 @@
 
       <!-- 공연 심사 탭 -->
       <div id="tabPerformances" class="tab-pane p-3" style="display:none">
-        <h6 class="mb-2">공연 심사 대기 목록</h6>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">공연 심사 목록 (심사중 + 승인완료)</h6>
+          <small class="text-muted">REVIEW → 승인/반려 · APPROVED → 게시</small>
+        </div>
         <table class="table table-sm table-hover mb-0">
-          <thead class="table-light"><tr><th>ID</th><th>공연명</th><th>기획사</th><th>카테고리</th><th>신청일</th><th>관리</th></tr></thead>
-          <tbody id="performanceTbody"><tr><td colspan="6" class="text-center text-muted py-3">로딩 중...</td></tr></tbody>
+          <thead class="table-light"><tr><th>ID</th><th>공연명</th><th>기획사</th><th>카테고리</th><th>상태</th><th>신청일</th><th>관리</th></tr></thead>
+          <tbody id="performanceTbody"><tr><td colspan="7" class="text-center text-muted py-3">로딩 중...</td></tr></tbody>
         </table>
       </div>
 
@@ -163,16 +169,18 @@ function loadTabData(tabId) {
     $.get('/backoffice/super/api/dashboard/promoters').done(function(rows) {
       var html = '';
       (rows || []).forEach(function(p) {
-        var statusBadge = p.status === 'PENDING' ? 'bg-warning text-dark' :
-                          p.status === 'APPROVED' ? 'bg-success' : 'bg-secondary';
+        var st = p.approvalStatus || p.status;
+        var statusBadge = st === 'PENDING' ? 'bg-warning text-dark' :
+                          st === 'APPROVED' ? 'bg-success' : 'bg-secondary';
+        var stKo = { PENDING:'승인대기', APPROVED:'승인', REJECTED:'거절' }[st] || st;
         html += '<tr>' +
           '<td>' + p.promoterId + '</td>' +
-          '<td><b>' + p.companyName + '</b></td>' +
-          '<td>' + (p.representativeName || '-') + '</td>' +
-          '<td><span class="badge ' + statusBadge + '">' + p.status + '</span></td>' +
+          '<td><b>' + (p.companyName || '-') + '</b></td>' +
+          '<td>' + (p.representative || p.memberName || '-') + '</td>' +
+          '<td><span class="badge ' + statusBadge + '">' + stKo + '</span></td>' +
           '<td class="small">' + (p.createdAt || '').substring(0,10) + '</td>' +
           '<td>' +
-            (p.status === 'PENDING'
+            (st === 'PENDING'
               ? '<button class="btn btn-xs btn-success me-1" onclick="approvePromoter(' + p.promoterId + ')">승인</button>' +
                 '<button class="btn btn-xs btn-danger" onclick="rejectPromoter(' + p.promoterId + ')">거절</button>'
               : '-') +
@@ -184,39 +192,61 @@ function loadTabData(tabId) {
     $.get('/backoffice/super/api/dashboard/venue-managers').done(function(rows) {
       var html = '';
       (rows || []).forEach(function(v) {
-        var statusBadge = v.status === 'PENDING' ? 'bg-warning text-dark' :
-                          v.status === 'APPROVED' ? 'bg-success' : 'bg-secondary';
+        var st = v.approvalStatus || v.status;
+        var statusBadge = st === 'PENDING' ? 'bg-warning text-dark' :
+                          st === 'APPROVED' ? 'bg-success' : 'bg-secondary';
+        var stKo = { PENDING:'승인대기', APPROVED:'승인', REJECTED:'거절' }[st] || st;
+        var id = v.managerId || v.venueManagerId;
         html += '<tr>' +
-          '<td>' + v.venueManagerId + '</td>' +
+          '<td>' + id + '</td>' +
           '<td>' + (v.memberName || '-') + '</td>' +
           '<td>' + (v.venueName || '-') + '</td>' +
-          '<td><span class="badge ' + statusBadge + '">' + v.status + '</span></td>' +
+          '<td><span class="badge ' + statusBadge + '">' + stKo + '</span></td>' +
           '<td class="small">' + (v.createdAt || '').substring(0,10) + '</td>' +
           '<td>' +
-            (v.status === 'PENDING'
-              ? '<button class="btn btn-xs btn-success me-1" onclick="approveVenueManager(' + v.venueManagerId + ')">승인</button>' +
-                '<button class="btn btn-xs btn-danger" onclick="rejectVenueManager(' + v.venueManagerId + ')">거절</button>'
+            (st === 'PENDING'
+              ? '<button class="btn btn-xs btn-success me-1" onclick="approveVenueManager(' + id + ')">승인</button>' +
+                '<button class="btn btn-xs btn-danger" onclick="rejectVenueManager(' + id + ')">거절</button>'
               : '-') +
           '</td></tr>';
       });
       $('#venueManagerTbody').html(html || '<tr><td colspan="6" class="text-center text-muted">데이터 없음</td></tr>');
     });
   } else if (tabId === 'tabPerformances') {
-    $.get('/backoffice/super/api/dashboard/review-performances').done(function(rows) {
+    // REVIEW와 APPROVED 공연을 하나로 합쳐 표시
+    $.when(
+      $.get('/backoffice/super/api/performances?approvalStatus=REVIEW&page=1'),
+      $.get('/backoffice/super/api/performances?approvalStatus=APPROVED&page=1')
+    ).done(function(reviewResp, approvedResp) {
+      var reviewRows   = (reviewResp[0]   && reviewResp[0].data)   ? reviewResp[0].data.content   : [];
+      var approvedRows = (approvedResp[0] && approvedResp[0].data) ? approvedResp[0].data.content : [];
+      var allRows = reviewRows.concat(approvedRows);
+
+      var statusBadge = function(st) {
+        return st === 'REVIEW'   ? '<span class="badge bg-warning text-dark">심사중</span>' :
+               st === 'APPROVED' ? '<span class="badge bg-info text-dark">승인완료</span>' :
+               '<span class="badge bg-secondary">' + st + '</span>';
+      };
       var html = '';
-      (rows || []).forEach(function(p) {
+      allRows.forEach(function(p) {
+        var st = p.approvalStatus;
+        var actions = '';
+        if (st === 'REVIEW') {
+          actions = '<button class="btn btn-xs btn-success me-1" onclick="approvePerf(' + p.performanceId + ')">승인</button>' +
+                    '<button class="btn btn-xs btn-danger" onclick="rejectPerf(' + p.performanceId + ')">반려</button>';
+        } else if (st === 'APPROVED') {
+          actions = '<button class="btn btn-xs btn-primary" onclick="publishPerf(' + p.performanceId + ')">게시</button>';
+        }
         html += '<tr>' +
           '<td>' + p.performanceId + '</td>' +
-          '<td><b>' + p.title + '</b></td>' +
-          '<td>' + (p.promoterCompanyName || '-') + '</td>' +
-          '<td>' + (p.category || '-') + '</td>' +
+          '<td><b>' + (p.title || '-') + '</b></td>' +
+          '<td>' + (p.promoterCompanyName || p.companyName || '-') + '</td>' +
+          '<td>' + (p.category || p.genre || '-') + '</td>' +
+          '<td>' + statusBadge(st) + '</td>' +
           '<td class="small">' + (p.createdAt || '').substring(0,10) + '</td>' +
-          '<td>' +
-            '<button class="btn btn-xs btn-success me-1" onclick="approvePerf(' + p.performanceId + ')">승인</button>' +
-            '<button class="btn btn-xs btn-danger" onclick="rejectPerf(' + p.performanceId + ')">반려</button>' +
-          '</td></tr>';
+          '<td>' + actions + '</td></tr>';
       });
-      $('#performanceTbody').html(html || '<tr><td colspan="6" class="text-center text-muted">심사 대기 공연 없음</td></tr>');
+      $('#performanceTbody').html(html || '<tr><td colspan="7" class="text-center text-muted">심사 대기 / 승인 공연 없음</td></tr>');
     });
   } else if (tabId === 'tabVenues') {
     $.get('/backoffice/super/api/dashboard/venues').done(function(rows) {
@@ -281,9 +311,25 @@ function rejectVenueManager(id) {
 }
 
 function approvePerf(id) {
-  $.post('/backoffice/super/api/performances/' + id + '/approve')
-    .done(function(res) { Swal.fire('완료', res.message || '승인되었습니다.', 'success'); tabLoaded['tabPerformances']=false; loadTabData('tabPerformances'); loadSuperDashboard(); })
-    .fail(function(xhr) { Swal.fire('오류', xhr.responseJSON?.message || '처리 실패', 'error'); });
+  Swal.fire({title:'승인', text:'이 공연을 승인하시겠습니까?', icon:'question',
+    showCancelButton:true, confirmButtonText:'승인', cancelButtonText:'취소', confirmButtonColor:'#198754'})
+    .then(function(r) {
+      if (!r.isConfirmed) return;
+      $.post('/backoffice/super/api/performances/' + id + '/approve')
+        .done(function(res) { Swal.fire('완료', (res.message || '승인되었습니다.') + '\n이제 [게시(Publish)] 버튼으로 공개할 수 있습니다.', 'success'); tabLoaded['tabPerformances']=false; loadTabData('tabPerformances'); loadSuperDashboard(); })
+        .fail(function(xhr) { Swal.fire('오류', xhr.responseJSON?.message || '처리 실패', 'error'); });
+    });
+}
+
+function publishPerf(id) {
+  Swal.fire({title:'게시(Publish)', text:'이 공연을 ON_SALE 상태로 공개하시겠습니까?', icon:'question',
+    showCancelButton:true, confirmButtonText:'게시', cancelButtonText:'취소', confirmButtonColor:'#0d6efd'})
+    .then(function(r) {
+      if (!r.isConfirmed) return;
+      $.post('/backoffice/super/api/performances/' + id + '/publish')
+        .done(function(res) { Swal.fire('완료', res.message || '공연이 공개되었습니다.', 'success'); tabLoaded['tabPerformances']=false; loadTabData('tabPerformances'); })
+        .fail(function(xhr) { Swal.fire('오류', xhr.responseJSON?.message || '처리 실패', 'error'); });
+    });
 }
 
 function rejectPerf(id) {

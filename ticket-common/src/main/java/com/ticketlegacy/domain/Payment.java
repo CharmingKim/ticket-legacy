@@ -5,14 +5,21 @@ import java.time.LocalDateTime;
 
 @Getter @Setter @NoArgsConstructor
 public class Payment {
-    private Long paymentId;
+    private Long id;
     private Long reservationId;
-    private String idempotencyKey;
+    private Long memberId;
     private int amount;
+    private Long couponId;
+    private int discountAmount;
+    private int finalAmount;
     private String method;
-    private String pgTransactionId;
     private String status;
-    private String failureReason;
+    private String idempotencyKey;
+    private String pgTransactionId;
+    private String failReason;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
+
+    public Long getPaymentId()      { return id; }
+    public void setPaymentId(Long v) { this.id = v; }
 }

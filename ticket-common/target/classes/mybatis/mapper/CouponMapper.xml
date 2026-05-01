@@ -63,6 +63,8 @@
         FROM coupon c
         JOIN coupon_template ct ON c.template_id = ct.template_id
         WHERE c.member_id = #{memberId}
+          AND c.status = 'ISSUED'
+          AND c.expires_at > NOW()
         ORDER BY c.issued_at DESC
     </select>
 

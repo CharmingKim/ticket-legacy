@@ -47,11 +47,24 @@ public class PartnerVenueController {
 
     private Long currentVenueId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return ((LoginUser) auth.getPrincipal()).getVenueId();
+        if (auth == null || !(auth.getPrincipal() instanceof LoginUser)) {
+            throw new com.ticketlegacy.exception.BusinessException(
+                    com.ticketlegacy.exception.ErrorCode.AUTH_FORBIDDEN, "공연장 담당자 인증이 필요합니다.");
+        }
+        Long venueId = ((LoginUser) auth.getPrincipal()).getVenueId();
+        if (venueId == null) {
+            throw new com.ticketlegacy.exception.BusinessException(
+                    com.ticketlegacy.exception.ErrorCode.AUTH_FORBIDDEN, "공연장 담당자 계정이 아닙니다.");
+        }
+        return venueId;
     }
 
     private Long currentMemberId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof LoginUser)) {
+            throw new com.ticketlegacy.exception.BusinessException(
+                    com.ticketlegacy.exception.ErrorCode.AUTH_FORBIDDEN, "인증이 필요합니다.");
+        }
         return ((LoginUser) auth.getPrincipal()).getMemberId();
     }
 

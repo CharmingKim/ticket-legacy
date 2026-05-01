@@ -3,8 +3,8 @@
 <c:set var="uri" value="${pageContext.request.requestURI}" />
 <div class="sidebar-brand">
     <span class="sidebar-badge">HQ</span>
-    <h2>Backoffice</h2>
-    <p>Operations, support, and governance</p>
+    <h2>백오피스</h2>
+    <p>운영 지원 시스템</p>
 </div>
 
 <c:if test="${loginRole == 'SUPER_ADMIN'}">

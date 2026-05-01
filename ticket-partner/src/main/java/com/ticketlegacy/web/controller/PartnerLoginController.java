@@ -44,7 +44,7 @@ public class PartnerLoginController {
                     .body(ApiResponse.error("파트너 계정이 아닙니다."));
         }
 
-        Cookie cookie = new Cookie("ACCESS_TOKEN", result.token);
+        Cookie cookie = new Cookie("PARTNER_TOKEN", result.token);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60 * 2);
@@ -61,7 +61,7 @@ public class PartnerLoginController {
     @PostMapping("/api/logout")
     @ResponseBody
     public ResponseEntity<ApiResponse<?>> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie("ACCESS_TOKEN", "");
+        Cookie cookie = new Cookie("PARTNER_TOKEN", "");
         cookie.setMaxAge(0);
         cookie.setPath("/");
         response.addCookie(cookie);

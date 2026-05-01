@@ -26,6 +26,25 @@ public class Coupon {
 
     // JSP alias getters
     public String getCouponName()    { return templateName; }
-    public int    getDiscountAmount(){ return discountValue; }
     public LocalDateTime getExpiryDate() { return expiresAt; }
+
+    /** UI 표기용 — PERCENT/FIXED 구분해서 사람이 읽는 텍스트로 변환 */
+    public String getDiscountText() {
+        if ("PERCENT".equals(discountType)) {
+            String s = discountValue + "%";
+            if (maxDiscount != null && maxDiscount > 0) s += " (최대 " + String.format("%,d", maxDiscount) + "원)";
+            return s;
+        }
+        return String.format("%,d", discountValue) + "원";
+    }
+
+    /** 결제금액 기준 실제 할인액 계산 (서버측 검증과 동일 로직) */
+    public int calculateDiscount(int amount) {
+        if (amount < minAmount) return 0;
+        if ("PERCENT".equals(discountType)) {
+            int d = (int) Math.round(amount * discountValue / 100.0);
+            return maxDiscount != null ? Math.min(d, maxDiscount) : d;
+        }
+        return Math.min(discountValue, amount);
+    }
 }

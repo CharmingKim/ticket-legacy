@@ -14,6 +14,8 @@ public interface VenueManagerMapper {
                                      @Param("offset") int offset,
                                      @Param("limit") int limit);
     int countByStatus(@Param("status") String status);
+    List<VenueManager> findAll(@Param("offset") int offset, @Param("limit") int limit);
+    int countAll();
     int insert(VenueManager venueManager);
     int updateApproval(@Param("managerId") Long managerId,
                        @Param("approvalStatus") String approvalStatus,
