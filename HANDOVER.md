@@ -39,12 +39,18 @@
 - **JSP EL 버그 수정** (`member-list.jsp`): JS 템플릿 리터럴 `${item.name}` 등을 JSP EL이 서버사이드에서 `"false"` 로 치환하는 문제 → 문자열 연결(`+`)로 전면 교체. `loadVenueOptions()` 동일 수정.
 - **회원 상태 드롭다운 FSM 적용** (`member-list.jsp`, `member-search.jsp`): 현재 상태 기반 유효 전환만 노출 (DORMANT 제거 — 시스템 자동 전환 전용), WITHDRAWN 시 SweetAlert 확인 다이얼로그 추가, WITHDRAWN 회원은 "변경 불가" 텍스트로 표시
 
+**직전 세션(11차)에서 한 것**
+- **Phase 1 어드민/파트너 파이프라인 완전 개통 ✅**
+- [Admin] 공연 상세 통합 조회 API 및 `dashboard.jsp` 미리보기 모달 UI 추가 (공연일정·구역가격 확인 가능).
+- [Admin] 미리보기 후 승인 → 게시(Publish) 로 이어지는 워크플로우 UI 완성.
+- [Admin] `BackofficeAnalyticsController.java`에서 DB 데이터 0건 조회 시 `Map.of()` 로 인한 NPE 발생 문제 해결 (`HashMap`으로 교체).
+- [Partner] `performance-list.jsp`에 공연장 구역(Section)별 좌석 등급 및 가격을 설정하는 모달 UI 추가.
+
 **다음 세션 시작 순서**
-1. **Phase A 나머지**: 존재하지 않는 회원 ID 상태변경 → 404 확인 (F12 Console fetch로 30초)
-2. **Phase B1 이어서 테스트**: 회원 목록 렌더링·검색·FSM 항목들
-3. **Phase 2 어드민 기능 완성** — 통계 NPE 방어, 회원 상세 조회 모달
-2. **Phase 3 파트너** — 좌석등급 설정 UI
-3. **Phase 4 유저** — 쿠폰 적용 UI, 공연 검색/필터
+1. **Phase 2 (결제/쿠폰)** — 유저 결제 화면(`payment.jsp`) 쿠폰 적용 UI 및 실시간 할인 금액 계산 로직.
+2. **Phase 2 (결제/쿠폰)** — PG 결제 시뮬레이션 및 가격 조작(1원 결제 등) 무결성 방어 백엔드 점검.
+3. **Phase 3 (예매 동시성)** — Redis/DB 정합성 확보 및 환불 엣지 케이스 점검.
+4. **Phase 4 (기능 확장)** — 유저 검색/필터 등.
 
 **즉시 실행 체크리스트**
 ```bash
@@ -59,6 +65,7 @@ mvn tomcat7:run -pl ticket-user    -am    # :8080
 mvn tomcat7:run -pl ticket-partner -am    # :8081
 mvn tomcat7:run -pl ticket-admin   -am    # :8082
 ```
+
 
 ---
 
