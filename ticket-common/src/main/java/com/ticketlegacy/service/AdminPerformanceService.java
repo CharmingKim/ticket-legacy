@@ -56,8 +56,20 @@ public class AdminPerformanceService {
     }
 
     // ─────────────────────────────────────────────────
+    // 공연 상세 조회
+    // ─────────────────────────────────────────────────
+
+    public Performance getPerformanceById(Long performanceId) {
+        return performanceMapper.findById(performanceId);
+    }
+
+    // ─────────────────────────────────────────────────
     // 공연별 등급/가격 설정
     // ─────────────────────────────────────────────────
+
+    public List<PerformanceSeatGrade> findSeatGrades(Long performanceId) {
+        return performanceSeatGradeMapper.findByPerformanceId(performanceId);
+    }
 
     @Transactional
     public void savePerformanceSeatGrades(Long performanceId, List<PerformanceSeatGrade> grades) {

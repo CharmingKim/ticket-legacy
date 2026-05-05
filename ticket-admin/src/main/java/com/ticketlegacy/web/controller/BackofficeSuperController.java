@@ -273,6 +273,21 @@ public class BackofficeSuperController {
         return ResponseEntity.ok(ApiResponse.success(performanceApprovalService.searchPerformances(query)));
     }
 
+    @GetMapping("/api/performances/{performanceId}/details")
+    @ResponseBody
+    public ResponseEntity<?> getPerformanceDetails(@PathVariable Long performanceId) {
+        // 도메인을 통째로 반환하지 않고 맵으로 가공하거나 DTO를 쓰지만, Admin 백오피스용이므로 Map 조합 활용
+        Performance perf = adminPerformanceService.getPerformanceById(performanceId); // 해당 메서드가 없으면 만들어야 함
+        List<Schedule> schedules = adminPerformanceService.findSchedulesByPerformanceId(performanceId);
+        List<PerformanceSeatGrade> grades = adminPerformanceService.findSeatGrades(performanceId); // 이것도 만들어야 함
+        
+        return ResponseEntity.ok(Map.of(
+                "performance", perf,
+                "schedules", schedules,
+                "grades", grades
+        ));
+    }
+
     @PostMapping("/api/performances/{performanceId}/approve")
     @ResponseBody
     public ResponseEntity<ApiResponse<Void>> approvePerformance(
@@ -458,6 +473,12 @@ public class BackofficeSuperController {
     public ResponseEntity<?> generateInventories(@PathVariable Long scheduleId) {
         adminPerformanceService.generateScheduleInventories(scheduleId);
         return ResponseEntity.ok(Map.of("message", "좌석 인벤토리가 활성화되었습니다."));
+    }
+
+    @GetMapping("/api/performances/{performanceId}/seat-grades")
+    @ResponseBody
+    public ResponseEntity<?> getSeatGrades(@PathVariable Long performanceId) {
+        return ResponseEntity.ok(adminPerformanceService.findSeatGrades(performanceId));
     }
 
     @PostMapping("/api/performances/{performanceId}/seat-grades")

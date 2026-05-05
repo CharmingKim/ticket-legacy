@@ -25,8 +25,8 @@
                 <th>공연</th>
                 <th>상태</th>
                 <th>예매 오픈</th>
-                <th>일정</th>
-                <th>좌석</th>
+                <th>일정 관리</th>
+                <th>좌석 관리</th>
                 <th>관리</th>
             </tr>
             </thead>
@@ -54,7 +54,12 @@ function loadPromoterPerformances() {
                 '<td><span class="badge-status badge-' + item.approvalStatus + '">' + statusLabel + '</span></td>' +
                 '<td>' + (item.ticketOpenAt || '-') + '</td>' +
                 '<td><button class="btn btn-outline-secondary btn-sm" onclick="addQuickSchedule(' + item.performanceId + ')">일정 추가</button></td>' +
-                '<td><button class="btn btn-outline-secondary btn-sm" onclick="generateSeats(' + item.performanceId + ')">좌석 생성</button></td>' +
+                '<td>' +
+                  '<div class="d-flex flex-column gap-1">' +
+                    '<button class="btn btn-outline-info btn-sm" onclick="openSeatGradeModal(' + item.performanceId + ', ' + item.venueId + ')">등급/가격 설정</button>' +
+                    '<button class="btn btn-outline-secondary btn-sm" onclick="generateSeats(' + item.performanceId + ')">좌석 생성</button>' +
+                  '</div>' +
+                '</td>' +
                 '<td class="d-flex gap-2">' + submitBtn + '</td>' +
                 '</tr>';
         }).join('');
@@ -109,6 +114,127 @@ function addQuickSchedule(performanceId) {
     });
 }
 
+// ─────────────────────────────────────────────────────────
+// 좌석 등급/가격 설정 모달 로직
+// ─────────────────────────────────────────────────────────
+var currentSeatGradePerfId = null;
+
+function openSeatGradeModal(performanceId, venueId) {
+    currentSeatGradePerfId = performanceId;
+    
+    $.when(
+        $.get('/partner/promoter/api/venues/' + venueId + '/sections'),
+        $.get('/partner/promoter/api/performances/' + performanceId + '/seat-grades')
+    ).done(function(sectionsRes, gradesRes) {
+        var sections = sectionsRes[0] || [];
+        var grades = gradesRes[0] || [];
+        
+        // sectionId를 키로 하여 기존 설정값 매핑
+        var gradeMap = {};
+        grades.forEach(function(g) {
+            gradeMap[g.sectionId] = g;
+        });
+        
+        var html = '';
+        if (sections.length === 0) {
+            html = '<tr><td colspan="4" class="text-center text-muted">공연장에 등록된 구역이 없습니다.</td></tr>';
+        } else {
+            sections.forEach(function(sec) {
+                var existing = gradeMap[sec.sectionId] || { grade: '', price: '' };
+                html += '<tr>' +
+                    '<td><input type="hidden" class="sg-section-id" value="' + sec.sectionId + '">' + sec.sectionName + '</td>' +
+                    '<td>' + sec.sectionType + ' (' + sec.totalRows + '행)</td>' +
+                    '<td><input type="text" class="form-control form-control-sm sg-grade" placeholder="VIP, R, S..." value="' + existing.grade + '"></td>' +
+                    '<td><input type="number" class="form-control form-control-sm sg-price" placeholder="가격(원)" value="' + existing.price + '"></td>' +
+                '</tr>';
+            });
+        }
+        $('#seatGradeRows').html(html);
+        new bootstrap.Modal(document.getElementById('seatGradeModal')).show();
+    }).fail(function() {
+        Swal.fire('오류', '구역 및 등급 정보를 불러오지 못했습니다.', 'error');
+    });
+}
+
+function saveSeatGrades() {
+    var grades = [];
+    var hasError = false;
+    
+    $('#seatGradeRows tr').each(function() {
+        var sectionId = $(this).find('.sg-section-id').val();
+        if (!sectionId) return; // empty row
+        
+        var grade = $(this).find('.sg-grade').val().trim();
+        var priceStr = $(this).find('.sg-price').val().trim();
+        
+        if (grade || priceStr) { // 둘 중 하나라도 입력했으면 둘 다 필수
+            if (!grade || !priceStr) {
+                hasError = true;
+                return false; // break each
+            }
+            grades.push({
+                sectionId: Number(sectionId),
+                grade: grade,
+                price: Number(priceStr)
+            });
+        }
+    });
+    
+    if (hasError) {
+        Swal.fire('경고', '등급과 가격은 함께 입력되어야 합니다.', 'warning');
+        return;
+    }
+    
+    $.ajax({
+        url: '/partner/promoter/api/performances/' + currentSeatGradePerfId + '/seat-grades',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ grades: grades })
+    }).done(function(res) {
+        Swal.fire('완료', res.message, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('seatGradeModal')).hide();
+    }).fail(function(xhr) {
+        Swal.fire('오류', xhr.responseJSON?.message || '저장 실패', 'error');
+    });
+}
+
 $('#approvalStatusFilter').on('change', loadPromoterPerformances);
 $(loadPromoterPerformances);
 </script>
+
+<!-- 좌석 등급/가격 설정 모달 -->
+<div class="modal fade" id="seatGradeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-tags me-2"></i>좌석 등급 및 가격 설정</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info small py-2 mb-3">
+          공연장의 각 구역별로 적용할 티켓 등급(VIP, R, S 등)과 가격을 설정합니다. <br>
+          설정하지 않은 구역은 빈칸으로 두시면 해당 구역 좌석은 생성되지 않습니다.
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-bordered table-sm align-middle small text-center mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th width="25%">구역명</th>
+                        <th width="25%">타입</th>
+                        <th width="25%">등급 명칭 (예: VIP)</th>
+                        <th width="25%">가격 (원)</th>
+                    </tr>
+                </thead>
+                <tbody id="seatGradeRows">
+                    <!-- JS 렌더링 -->
+                </tbody>
+            </table>
+        </div>
+      </div>
+      <div class="modal-footer border-top-0">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveSeatGrades()">저장하기</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -85,13 +85,14 @@ public class BackofficeAnalyticsController {
     @GetMapping("/all")
     @ResponseBody
     public ResponseEntity<?> allStats() {
-        return ResponseEntity.ok(Map.of(
-            "kpi",            analyticsMapper.findPlatformKpiSummary(),
-            "dailyTrend",     analyticsMapper.findDailyReservationTrend(7),
-            "monthlyRevenue", analyticsMapper.findMonthlyRevenueTrend(12),
-            "categoryDist",   analyticsMapper.findPerformanceCategoryStats(),
-            "topPromoters",   analyticsMapper.findTopPromotersByRevenue(5),
-            "topPerformances",analyticsMapper.findTopPerformancesByRevenue(5)
-        ));
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("kpi", analyticsMapper.findPlatformKpiSummary());
+        response.put("dailyTrend", analyticsMapper.findDailyReservationTrend(7));
+        response.put("monthlyRevenue", analyticsMapper.findMonthlyRevenueTrend(12));
+        response.put("categoryDist", analyticsMapper.findPerformanceCategoryStats());
+        response.put("topPromoters", analyticsMapper.findTopPromotersByRevenue(5));
+        response.put("topPerformances", analyticsMapper.findTopPerformancesByRevenue(5));
+        
+        return ResponseEntity.ok(response);
     }
 }

@@ -231,11 +231,14 @@ function loadTabData(tabId) {
       allRows.forEach(function(p) {
         var st = p.approvalStatus;
         var actions = '';
+        var previewBtn = '<button class="btn btn-xs btn-outline-info me-1" onclick="previewPerf(' + p.performanceId + ')"><i class="bi bi-search"></i> 미리보기</button>';
         if (st === 'REVIEW') {
-          actions = '<button class="btn btn-xs btn-success me-1" onclick="approvePerf(' + p.performanceId + ')">승인</button>' +
+          actions = previewBtn + 
+                    '<button class="btn btn-xs btn-success me-1" onclick="approvePerf(' + p.performanceId + ')">승인</button>' +
                     '<button class="btn btn-xs btn-danger" onclick="rejectPerf(' + p.performanceId + ')">반려</button>';
         } else if (st === 'APPROVED') {
-          actions = '<button class="btn btn-xs btn-primary" onclick="publishPerf(' + p.performanceId + ')">게시</button>';
+          actions = previewBtn + 
+                    '<button class="btn btn-xs btn-primary" onclick="publishPerf(' + p.performanceId + ')">게시</button>';
         }
         html += '<tr>' +
           '<td>' + p.performanceId + '</td>' +
@@ -343,4 +346,72 @@ function rejectPerf(id) {
         .fail(function(xhr) { Swal.fire('오류', xhr.responseJSON?.message || '처리 실패', 'error'); });
     });
 }
+
+function previewPerf(id) {
+  $.get('/backoffice/super/api/performances/' + id + '/details').done(function(res) {
+    var p = res.performance;
+    var schedules = res.schedules || [];
+    var grades = res.grades || [];
+    
+    var html = '<h6>기본 정보</h6>' +
+      '<table class="table table-bordered table-sm small mb-3">' +
+      '<tr><th class="bg-light" width="30%">공연명</th><td>' + (p.title || '') + '</td></tr>' +
+      '<tr><th class="bg-light">카테고리</th><td>' + (p.category || '') + '</td></tr>' +
+      '<tr><th class="bg-light">관람연령</th><td>' + (p.ageLimit || 0) + '세 이상</td></tr>' +
+      '<tr><th class="bg-light">관람시간</th><td>' + (p.duration || 0) + '분</td></tr>' +
+      '</table>' +
+      '<h6>공연 일정 (' + schedules.length + '회차)</h6>' +
+      '<div class="mb-3" style="max-height: 100px; overflow-y: auto;">' +
+      '<ul class="list-group list-group-sm small">';
+      
+    if (schedules.length === 0) {
+      html += '<li class="list-group-item text-muted">등록된 회차가 없습니다.</li>';
+    } else {
+      schedules.forEach(function(s) {
+        var d = s.showDate ? s.showDate : '';
+        var t = s.showTime ? (s.showTime.length > 5 ? s.showTime.substring(0, 5) : s.showTime) : '';
+        html += '<li class="list-group-item">' + d + ' ' + t + '</li>';
+      });
+    }
+    html += '</ul></div>' +
+      '<h6>좌석 등급 및 가격 (' + grades.length + '건)</h6>' +
+      '<div style="max-height: 150px; overflow-y: auto;">' +
+      '<table class="table table-sm table-bordered small text-center">' +
+      '<thead class="table-light"><tr><th>구역 ID</th><th>등급</th><th>가격</th></tr></thead><tbody>';
+      
+    if (grades.length === 0) {
+      html += '<tr><td colspan="3" class="text-muted">설정된 좌석 등급이 없습니다.</td></tr>';
+    } else {
+      grades.forEach(function(g) {
+        html += '<tr><td>' + g.sectionId + '</td><td>' + g.grade + '</td><td>' + g.price.toLocaleString() + '원</td></tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+    
+    // 모달 삽입 및 표시
+    $('#perfPreviewBody').html(html);
+    var modal = new bootstrap.Modal(document.getElementById('perfPreviewModal'));
+    modal.show();
+  }).fail(function() {
+    Swal.fire('오류', '공연 상세 정보를 불러올 수 없습니다.', 'error');
+  });
+}
 </script>
+
+<!-- 공연 미리보기 모달 -->
+<div class="modal fade" id="perfPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-card-text me-2"></i>공연 심사 미리보기</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="perfPreviewBody">
+        <!-- JS로 채워짐 -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
