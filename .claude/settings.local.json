@@ -47,7 +47,23 @@
       "PowerShell(npm *)",
       "PowerShell(pip show *)",
       "PowerShell(pip install *)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "PowerShell(python --version)",
+      "PowerShell(py *)",
+      "PowerShell($env:PATH -split ';' | Where-Object { $_ -match 'python|Python' })",
+      "PowerShell(& \"C:\\\\Users\\\\USER\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\python.exe\" --version 2>&1)",
+      "PowerShell(reg query *)",
+      "PowerShell($env:PATH)",
+      "PowerShell(winget list *)",
+      "PowerShell(cmd /c \"where python3 2>&1\")",
+      "PowerShell(cmd /c \"dir C:\\\\Users\\\\USER\\\\AppData\\\\Local\\\\Programs\\\\ /b 2>&1\")",
+      "PowerShell(cmd /c \"python3 --version 2>&1\")",
+      "PowerShell(winget search *)",
+      "PowerShell(cmd /c \"wmic logicaldisk get caption 2>&1\")",
+      "PowerShell(cmd /c \"dir D:\\\\ /b 2>&1\")",
+      "PowerShell(cmd /c \"dir D:\\\\spring-legacy\\\\ /b 2>&1\")",
+      "PowerShell(cmd /c \"dir D:\\\\spring-legacy\\\\ticket-parent\\\\ /b 2>&1\")",
+      "PowerShell(winget install *)"
     ]
   }
 }
