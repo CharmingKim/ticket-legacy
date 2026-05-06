@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.WaitlistMapper">
+
+    <insert id="insert">
+        INSERT INTO reservation_waitlist (schedule_id, member_id, status)
+        VALUES (#{scheduleId}, #{memberId}, 'WAITING')
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM reservation_waitlist
+        WHERE schedule_id = #{scheduleId} AND member_id = #{memberId}
+    </delete>
+
+    <select id="countByScheduleAndMember" resultType="int">
+        SELECT COUNT(*) FROM reservation_waitlist
+        WHERE schedule_id = #{scheduleId} AND member_id = #{memberId}
+    </select>
+
+    <select id="findByMemberId" resultType="com.ticketlegacy.domain.Waitlist">
+        SELECT w.*, p.title as performanceTitle, sc.show_date as showDate, sc.show_time as showTime
+        FROM reservation_waitlist w
+        JOIN schedule sc ON w.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        WHERE w.member_id = #{memberId}
+        ORDER BY w.created_at DESC
+    </select>
+
+    <select id="findWaitingByScheduleId" resultType="com.ticketlegacy.domain.Waitlist">
+        SELECT * FROM reservation_waitlist
+        WHERE schedule_id = #{scheduleId} AND status = 'WAITING'
+        ORDER BY created_at ASC
+    </select>
+
+    <update id="updateStatus">
+        UPDATE reservation_waitlist SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <update id="setNotified">
+        UPDATE reservation_waitlist SET status = 'NOTIFIED', notified_at = NOW() WHERE id = #{id}
+    </update>
+
+</mapper>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.InquiryMapper">
+
+    <insert id="insert" parameterType="com.ticketlegacy.domain.Inquiry" useGeneratedKeys="true" keyProperty="inquiryId">
+        INSERT INTO inquiry (member_id, category, title, content, status)
+        VALUES (#{memberId}, #{category}, #{title}, #{content}, 'PENDING')
+    </insert>
+
+    <select id="findById" resultType="com.ticketlegacy.domain.Inquiry">
+        SELECT * FROM inquiry WHERE inquiry_id = #{inquiryId}
+    </select>
+
+    <select id="findByMemberId" resultType="com.ticketlegacy.domain.Inquiry">
+        SELECT * FROM inquiry
+        WHERE member_id = #{memberId}
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByMemberId" resultType="int">
+        SELECT COUNT(*) FROM inquiry WHERE member_id = #{memberId}
+    </select>
+
+    <update id="updateAnswer">
+        UPDATE inquiry
+        SET answer = #{answer}, 
+            answered_by = #{answeredBy}, 
+            answered_at = NOW(), 
+            status = 'ANSWERED'
+        WHERE inquiry_id = #{inquiryId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM inquiry WHERE inquiry_id = #{inquiryId}
+    </delete>
+
+</mapper>

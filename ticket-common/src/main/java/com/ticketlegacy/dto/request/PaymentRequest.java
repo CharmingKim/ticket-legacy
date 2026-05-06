@@ -10,6 +10,7 @@ public class PaymentRequest {
     @NotNull private Long scheduleId;
     @NotEmpty private List<Long> seatIds;
     @NotBlank private String method; // CARD, BANK_TRANSFER
-    @Min(1) private int amount;
+    @Min(0) private int amount;
     private String couponCode; // optional — null if no coupon applied
+    private String impUid; // PortOne UID
 }

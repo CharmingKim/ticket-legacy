@@ -53,6 +53,9 @@
                                         <c:when test="${r.status == 'CANCELLED'}">
                                             <span class="tl-badge tl-badge-danger">취소됨</span>
                                         </c:when>
+                                        <c:when test="${r.status == 'REFUNDED'}">
+                                            <span class="tl-badge tl-badge-muted">환불됨</span>
+                                        </c:when>
                                         <c:otherwise>
                                             <span class="tl-badge tl-badge-muted">${r.status}</span>
                                         </c:otherwise>
@@ -64,13 +67,19 @@
                                     </c:if>
                                 </td>
                                 <td>
-                                    <c:if test="${r.status == 'CONFIRMED'}">
-                                        <button class="btn-cancel tl-btn-outline btn-sm"
-                                                data-reservation-id="${r.reservationId}"
-                                                style="font-size:.78rem;padding:4px 12px">
-                                            취소
-                                        </button>
-                                    </c:if>
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="${pageContext.request.contextPath}/reservation/detail/${r.reservationId}" 
+                                           class="tl-btn-primary btn-sm" style="font-size:.78rem;padding:4px 12px;text-decoration:none">
+                                            상세
+                                        </a>
+                                        <c:if test="${r.status == 'CONFIRMED'}">
+                                            <button class="btn-cancel tl-btn-outline btn-sm"
+                                                    data-reservation-id="${r.reservationId}"
+                                                    style="font-size:.78rem;padding:4px 12px">
+                                                취소
+                                            </button>
+                                        </c:if>
+                                    </div>
                                 </td>
                             </tr>
                         </c:forEach>
@@ -88,6 +97,20 @@
             </div>
         </c:otherwise>
     </c:choose>
+
+    <c:if test="${totalPages > 1}">
+        <div class="tl-pagination mt-4">
+            <c:if test="${currentPage > 1}">
+                <a href="?page=${currentPage - 1}" class="tl-page-btn"><i class="bi bi-chevron-left"></i></a>
+            </c:if>
+            <c:forEach begin="1" end="${totalPages}" var="i">
+                <a href="?page=${i}" class="tl-page-btn ${i == currentPage ? 'active' : ''}">${i}</a>
+            </c:forEach>
+            <c:if test="${currentPage < totalPages}">
+                <a href="?page=${currentPage + 1}" class="tl-page-btn"><i class="bi bi-chevron-right"></i></a>
+            </c:if>
+        </div>
+    </c:if>
 </div>
 
 <script>
@@ -95,16 +118,42 @@ const ctx = '${pageContext.request.contextPath}';
 
 $(document).on('click', '.btn-cancel', function() {
     const reservationId = $(this).data('reservation-id');
-    if (!confirm('예매를 취소하시겠습니까? 취소 후에는 되돌릴 수 없습니다.')) return;
+    
+    Swal.fire({
+        title: '예매를 취소하시겠습니까?',
+        text: '취소 후에는 되돌릴 수 없으며, 환불 규정에 따라 처리됩니다.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '네, 취소합니다',
+        cancelButtonText: '아니오',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: '처리 중...',
+                text: '예매 취소를 진행하고 있습니다.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
 
-    api.post(ctx + '/api/reservations/' + reservationId + '/cancel', {})
-        .done(function(res) {
-            if (res.success) {
-                toast.success('예매가 취소되었습니다.');
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                toast.error(res.message || '취소에 실패했습니다.');
-            }
-        });
+            api.post(ctx + '/api/reservations/' + reservationId + '/cancel', {})
+                .done(function(res) {
+                    if (res.success) {
+                        Swal.fire('취소 완료', '예매가 성공적으로 취소되었습니다.', 'success').then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire('오류', res.message || '취소에 실패했습니다.', 'error');
+                    }
+                })
+                .fail(function() {
+                    Swal.fire('오류', '서버 통신 중 문제가 발생했습니다.', 'error');
+                });
+        }
+    });
 });
 </script>

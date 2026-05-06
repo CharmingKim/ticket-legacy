@@ -26,6 +26,7 @@ public class PerformanceApprovalService {
 
     private final PerformanceMapper performanceMapper;
     private final PromoterMapper    promoterMapper;
+    private final PerformanceSearchService searchService;
 
     // ──────────────────────────────────────────
     // 기획사: 공연 등록/수정/검토 요청
@@ -59,6 +60,10 @@ public class PerformanceApprovalService {
 
         performanceMapper.insert(p);
         log.info("공연 DRAFT 생성: promoterId={}, title={}", promoterId, p.getTitle());
+        
+        // Elasticsearch 자동 동기화
+        searchService.indexPerformance(p);
+        
         return p;
     }
 
@@ -86,6 +91,9 @@ public class PerformanceApprovalService {
             perf.setEndDate(java.time.LocalDate.parse((String) body.get("endDate")));
         performanceMapper.update(perf);
         log.info("공연 DRAFT 수정: performanceId={}", performanceId);
+
+        // Elasticsearch 자동 동기화
+        searchService.indexPerformance(perf);
     }
 
     @Transactional
@@ -107,6 +115,9 @@ public class PerformanceApprovalService {
         validateTransition(parseStatus(perf.getApprovalStatus()), PerformanceApprovalStatus.APPROVED);
         performanceMapper.updateApprovalStatus(performanceId, PerformanceApprovalStatus.APPROVED.name(), note, adminMemberId);
         log.info("공연 승인: performanceId={}, adminMemberId={}", performanceId, adminMemberId);
+
+        // Elasticsearch 자동 동기화 (변경된 상태 반영)
+        searchService.indexPerformance(getPerformanceOrThrow(performanceId));
     }
 
     @Transactional
@@ -115,6 +126,9 @@ public class PerformanceApprovalService {
         validateTransition(parseStatus(perf.getApprovalStatus()), PerformanceApprovalStatus.REJECTED);
         performanceMapper.updateApprovalStatus(performanceId, PerformanceApprovalStatus.REJECTED.name(), note, adminMemberId);
         log.info("공연 반려: performanceId={}, note={}", performanceId, note);
+
+        // Elasticsearch 자동 동기화
+        searchService.indexPerformance(getPerformanceOrThrow(performanceId));
     }
 
     @Transactional
@@ -125,6 +139,9 @@ public class PerformanceApprovalService {
         perf.setStatus("ON_SALE");
         performanceMapper.update(perf);
         log.info("공연 게시(판매 시작): performanceId={}", performanceId);
+
+        // Elasticsearch 자동 동기화 (PUBLISHED/ON_SALE 상태 반영)
+        searchService.indexPerformance(perf);
     }
 
     @Transactional

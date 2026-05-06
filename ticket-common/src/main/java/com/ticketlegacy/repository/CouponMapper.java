@@ -24,6 +24,7 @@ public interface CouponMapper {
     List<Coupon> findByMemberId(@Param("memberId") Long memberId);
     int useCoupon(@Param("couponCode") String couponCode,
                   @Param("reservationId") Long reservationId);
+    int restoreCoupon(@Param("reservationId") Long reservationId);
     int expireOverdueCoupons();
 
     // ── 통계 ──────────────────────────────────────

@@ -44,4 +44,22 @@
 		<nature>org.eclipse.m2e.core.maven2Nature</nature>
 		<nature>org.eclipse.wst.common.project.facet.core.nature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>src/main/resources</name>
+			<type>2</type>
+			<location>//D:/springGreen/springframework/works/ticket-parent/ticket-common/src/main/resources/</location>
+		</link>
+	</linkedResources>
+	<filteredResources>
+		<filter>
+			<id>1778027724362</id>
+			<name></name>
+			<type>30</type>
+			<matcher>
+				<id>org.eclipse.core.resources.regexFilterMatcher</id>
+				<arguments>node_modules|\.git|__CREATED_BY_JAVA_LANGUAGE_SERVER__</arguments>
+			</matcher>
+		</filter>
+	</filteredResources>
 </projectDescription>

@@ -13,6 +13,7 @@
         <result property="finalAmount"    column="final_amount" />
         <result property="status"         column="status" />
         <result property="idempotencyKey" column="idempotency_key" />
+        <result property="method"          column="method" />
         <result property="pgTransactionId" column="pg_transaction_id" />
         <result property="failReason"     column="fail_reason" />
         <result property="createdAt"      column="created_at" />
@@ -53,6 +54,21 @@
         UPDATE payment
         SET status = 'FAILED',
             fail_reason = #{failReason}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 예약 ID로 결제 조회 -->
+    <select id="findByReservationId" resultMap="paymentResultMap">
+        SELECT * FROM payment
+        WHERE reservation_id = #{reservationId} AND status = 'COMPLETED'
+        LIMIT 1
+    </select>
+
+    <!-- 결제 환불 처리 -->
+    <update id="updateRefunded">
+        UPDATE payment
+        SET status = 'REFUNDED',
+            fail_reason = #{reason}
         WHERE id = #{id}
     </update>
 

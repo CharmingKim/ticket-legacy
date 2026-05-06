@@ -26,13 +26,18 @@ import com.ticketlegacy.domain.SeatInventory;
 import com.ticketlegacy.dto.response.ApiResponse;
 import com.ticketlegacy.repository.ScheduleMapper;
 import com.ticketlegacy.repository.SeatInventoryMapper;
+import com.ticketlegacy.domain.Member;
 import com.ticketlegacy.service.CouponService;
+import com.ticketlegacy.service.MemberService;
+import com.ticketlegacy.service.PaymentService;
 import com.ticketlegacy.service.ReservationService;
 
 @Controller
 public class ReservationController {
 
     @Autowired private ReservationService reservationService;
+    @Autowired private PaymentService paymentService;
+    @Autowired private MemberService memberService;
     @Autowired private ScheduleMapper scheduleMapper;
     @Autowired private SeatInventoryMapper seatInventoryMapper;
     @Autowired private CouponService couponService;
@@ -57,11 +62,13 @@ public class ReservationController {
         List<Coupon> coupons = memberId != null
                 ? couponService.findByMemberId(memberId)
                 : Collections.emptyList();
+        Member member = memberId != null ? memberService.findById(memberId) : null;
 
         model.addAttribute("schedule", schedule);
         model.addAttribute("seats", seats);
         model.addAttribute("totalAmount", totalAmount);
         model.addAttribute("coupons", coupons);
+        model.addAttribute("member", member);
         model.addAttribute("scheduleId", scheduleId);
         model.addAttribute("seatIds", seatIds);
         return "reservation/confirm";
@@ -71,10 +78,42 @@ public class ReservationController {
     public String historyPage(@RequestParam(defaultValue = "1") int page,
                                HttpServletRequest request, Model model) {
         Long memberId = (Long) request.getAttribute("loginMemberId");
-        List<Reservation> list = reservationService.findByMemberId(memberId, page, 10);
-        model.addAttribute("reservations", list);
-        model.addAttribute("currentPage", page);
+        int size = 10;
+        List<Reservation> list  = reservationService.findByMemberId(memberId, page, size);
+        int total       = reservationService.countByMemberWithStatus(memberId, null);
+        int totalPages  = (int) Math.ceil((double) total / size);
+        model.addAttribute("reservations",  list);
+        model.addAttribute("currentPage",   page);
+        model.addAttribute("totalPages",    totalPages);
         return "reservation/history";
+    }
+
+    @GetMapping("/reservation/detail/{reservationId}")
+    public String detailPage(@PathVariable Long reservationId,
+                             HttpServletRequest request, Model model) {
+        Long memberId = (Long) request.getAttribute("loginMemberId");
+        Reservation reservation = reservationService.findById(reservationId);
+        
+        if (!reservation.getMemberId().equals(memberId)) {
+            return "redirect:/"; // 권한 없음
+        }
+        
+        model.addAttribute("reservation", reservation);
+        return "reservation/detail";
+    }
+
+    @GetMapping("/reservation/ticket/{reservationId}")
+    public String ticketPage(@PathVariable Long reservationId,
+                             HttpServletRequest request, Model model) {
+        Long memberId = (Long) request.getAttribute("loginMemberId");
+        Reservation reservation = reservationService.findById(reservationId);
+        
+        if (!reservation.getMemberId().equals(memberId) || !"CONFIRMED".equals(reservation.getStatus())) {
+            return "redirect:/"; // 권한 없거나 결제 안됨
+        }
+        
+        model.addAttribute("reservation", reservation);
+        return "reservation/ticket";
     }
 
     @PostMapping("/api/reservation/{reservationId}/cancel")
@@ -82,7 +121,14 @@ public class ReservationController {
     public ApiResponse<String> cancel(@PathVariable Long reservationId,
                                        HttpServletRequest request) {
         Long memberId = (Long) request.getAttribute("loginMemberId");
+        
+        // 1. 결제 환불 및 쿠폰 복구 (Phase 3 엣지 케이스 처리)
+        // 이 로직은 결제가 완료된(CONFIRMED) 예약에 대해서만 수행됩니다.
+        paymentService.refund(reservationId, "사용자 본인 취소");
+        
+        // 2. 예약 상태 변경 및 좌석 반환
         reservationService.cancel(reservationId, memberId);
+        
         return ApiResponse.success("예약이 취소되었습니다.");
     }
 

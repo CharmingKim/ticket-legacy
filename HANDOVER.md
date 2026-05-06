@@ -1,6 +1,6 @@
 # TicketLegacy — 인수인계 문서
 
-> 최신 업데이트: 2026-05-01 (10차 세션 — Phase A 테스트 2항목 통과, 회원 상태 드롭다운 FSM 적용)
+> 최신 업데이트: 2026-05-06 (12차 세션 — DB 통합 정비 및 Elasticsearch 데이터셋 구축)
 > 목적: 다음 세션이 현재 상태·미해결 이슈·실행 절차를 빠르게 파악
 
 ## 🎯 작업 자세 (Claude 가 코드 짤 때의 마인드셋)
@@ -39,6 +39,13 @@
 - **JSP EL 버그 수정** (`member-list.jsp`): JS 템플릿 리터럴 `${item.name}` 등을 JSP EL이 서버사이드에서 `"false"` 로 치환하는 문제 → 문자열 연결(`+`)로 전면 교체. `loadVenueOptions()` 동일 수정.
 - **회원 상태 드롭다운 FSM 적용** (`member-list.jsp`, `member-search.jsp`): 현재 상태 기반 유효 전환만 노출 (DORMANT 제거 — 시스템 자동 전환 전용), WITHDRAWN 시 SweetAlert 확인 다이얼로그 추가, WITHDRAWN 회원은 "변경 불가" 텍스트로 표시
 
+**직전 세션(12차)에서 한 것 — Antigravity (2026-05-06)**
+- **DB 스키마 단일화**: 분산된 45개 테이블 DDL → `db/schema_total.sql` 로 통합. FK 누락 컬럼 복구, 인코딩 깨짐 전수 제거, `SET FOREIGN_KEY_CHECKS=0` 전략으로 상호참조 안전 초기화.
+- **시드 인증 복구**: 기존 BCrypt 해시 불일치로 로그인 불가했던 문제 → `db/data_total.sql`로 전 계정(어드민·기획사·유저) 해시 일괄 교체. 비번 `Cks159753!` 단일화 완료.
+- **공연 데이터 고도화**: `db/data_extension.sql` — 14개 → 200개 이상. `WITH RECURSIVE`로 공연-등급-회차-좌석-인벤토리 유기적 생성. `total_seats`/`available_seats` 자동 보정 포함.
+- **Elasticsearch 준비**: `description` HTML 텍스트, `poster_url` picsum.photos 시드 URL 정규화 (`https://picsum.photos/seed/{perf_id}/400/550`).
+- **현재 DB 초기화 순서**: `schema_total.sql` → `data_total.sql` → `data_extension.sql` (3단계).
+
 **직전 세션(11차)에서 한 것**
 - **Phase 1 어드민/파트너 파이프라인 완전 개통 ✅**
 - [Admin] 공연 상세 통합 조회 API 및 `dashboard.jsp` 미리보기 모달 UI 추가 (공연일정·구역가격 확인 가능).
@@ -46,11 +53,33 @@
 - [Admin] `BackofficeAnalyticsController.java`에서 DB 데이터 0건 조회 시 `Map.of()` 로 인한 NPE 발생 문제 해결 (`HashMap`으로 교체).
 - [Partner] `performance-list.jsp`에 공연장 구역(Section)별 좌석 등급 및 가격을 설정하는 모달 UI 추가.
 
+**직전 세션(13차)에서 한 것 — 2026-05-06**
+- 카드 min-height 3.2rem + hover z-index 추가 → 그림자 가림 버그 해결
+- PerformanceController.detail()에 PerformanceSeatGradeMapper 주입 → 공연 상세 좌석 등급/가격 표시 버그 수정
+- detail.jsp `${g.gradeName}` → `${g.grade}` + sectionName 병기 수정
+- python-pptx 1.0.2 설치 완료 (Python 3.14)
+
+**PPT 작업 현황 (다음 세션 최우선)**
+- 파일: `D:\springGreen\springframework\works\ticket-parent\tr(티레).pptx` (테마 템플릿)
+- 템플릿 분석 완료:
+  - 슬라이드 크기: 20" × 11.25" (Canva 와이드)
+  - 10장, 전부 Blank 레이아웃, Placeholder 없음 → TextBox 직접 탐색 방식
+  - 폰트: Gotham Bold(제목 48pt), Canva Sans(본문)
+  - 색상: 네이비 #041F60(제목), 블루그레이 #667198(부제), 흑 #000000(본문)
+  - 배경: 단색(SOLID)
+- 요구사항:
+  - 40장 이상, 슬라이드 1장 + 대본 1장 교차 구성
+  - 애니메이션 자연스럽게 추가
+  - 그래프/차트 포함
+  - 대기업 수준 퀄리티
+  - 내용: 프로젝트 발표 (요구사항 명세 포함 체계적 구성)
+- **다음 세션 시작 멘트**: "ppt 마무리짓고 빨리 마무리지어줘"
+- 작업 방법: python-pptx로 템플릿 기반 새 파일 생성 (`ticketlegacy_presentation.pptx`)
+
 **다음 세션 시작 순서**
-1. **Phase 2 (결제/쿠폰)** — 유저 결제 화면(`payment.jsp`) 쿠폰 적용 UI 및 실시간 할인 금액 계산 로직.
-2. **Phase 2 (결제/쿠폰)** — PG 결제 시뮬레이션 및 가격 조작(1원 결제 등) 무결성 방어 백엔드 점검.
-3. **Phase 3 (예매 동시성)** — Redis/DB 정합성 확보 및 환불 엣지 케이스 점검.
-4. **Phase 4 (기능 확장)** — 유저 검색/필터 등.
+1. **PPT 생성** — python-pptx로 40장+ 발표자료 + 대본 교차 생성 (최우선)
+2. **Phase 3 (예매 동시성)** — Redis/DB 정합성 확보 및 환불 엣지 케이스 점검.
+3. **Phase 4 (기능 확장)** — 유저 검색/필터 등.
 
 **즉시 실행 체크리스트**
 ```bash
@@ -282,11 +311,13 @@ taskkill /PID <pid> /F
 **MyBatis 중복 namespace 오류**
 → `mapperLocations`를 `classpath:` (star 없음)로. 이미 `classpath:mybatis/mapper/**/*.xml`로 설정됨.
 
-**DB 초기화 / 시드 재주입**
+**DB 초기화 / 시드 재주입 (12차 이후 신규 절차)**
 ```bash
-mysql -uroot -p1234 < db/init.sql
+mysql -uroot -p1234 < db/schema_total.sql    # 스키마 DROP + 재생성 (45개 테이블)
+mysql -uroot -p1234 < db/data_total.sql      # 기본 시드 + BCrypt 해시 복구
+mysql -uroot -p1234 < db/data_extension.sql  # 공연 200개+ 확장 데이터
 ```
-→ `springgreen6` 스키마 DROP + 재생성 + 시드. 기존 데이터 전부 삭제되므로 개발 환경에서만 사용.
+→ 기존 데이터 전부 삭제되므로 개발 환경에서만 사용. `init.sql`은 레거시 — 더 이상 사용하지 않음.
 
 ---
 

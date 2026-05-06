@@ -28,6 +28,8 @@ public class ReservationService {
     @Autowired private ReservationMapper reservationMapper;
     @Autowired private SeatInventoryMapper seatInventoryMapper;
     @Autowired private com.ticketlegacy.repository.ScheduleMapper scheduleMapper;
+    @Autowired private WaitlistService waitlistService;
+    @Autowired(required = false) private StringRedisTemplate redisTemplate;
 
     /** 예약 생성 (PENDING 상태) */
     @Transactional
@@ -116,6 +118,15 @@ public class ReservationService {
 
         log.info("예약 취소 완료: reservationId={}, prevStatus={}, 좌석 수={}",
                 reservationId, prevStatus, seatIds.size());
+        
+        // 예매 대기자에게 알림 발송 시도
+        if ("CONFIRMED".equals(prevStatus)) {
+            try {
+                waitlistService.notifyNextInLine(reservation.getScheduleId());
+            } catch (Exception e) {
+                log.warn("예매 대기 알림 발송 중 오류: scheduleId={}, {}", reservation.getScheduleId(), e.getMessage());
+            }
+        }
     }
 
     /** 결제 실패 시 컨트롤러에서 호출하는 시스템 취소 — 멤버 소유권 검사 없음 */
@@ -186,7 +197,7 @@ public class ReservationService {
     // Redis 없는 프로젝트(ticket-admin)에서도 컴파일·구동 가능하도록 required=false.
     // ticket-user에서는 RedisConfig가 StringRedisTemplate 빈을 등록하므로 정상 주입됨.
     // Redis가 null일 때 좌석 상태 정리 실패는 이미 try-catch로 graceful degradation 처리.
-    @Autowired(required = false) private StringRedisTemplate redisTemplate;
+
 
     @Transactional
     public Reservation create(Long memberId, Long scheduleId, List<Long> seatIds, int totalAmount) {

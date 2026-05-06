@@ -10,6 +10,18 @@
             AND (title LIKE CONCAT('%', #{keyword}, '%')
               OR venue_name LIKE CONCAT('%', #{keyword}, '%'))
         </if>
+        <if test="startDate != null and startDate != ''">
+            AND start_date &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND end_date &lt;= #{endDate}
+        </if>
+        <if test="minPrice != null">
+            AND min_price &gt;= #{minPrice}
+        </if>
+        <if test="maxPrice != null">
+            AND min_price &lt;= #{maxPrice}
+        </if>
         ORDER BY ticket_open_at DESC LIMIT #{limit} OFFSET #{offset}
     </select>
     <select id="countAll" resultType="int">
@@ -21,6 +33,34 @@
             AND (title LIKE CONCAT('%', #{keyword}, '%')
               OR venue_name LIKE CONCAT('%', #{keyword}, '%'))
         </if>
+        <if test="startDate != null and startDate != ''">
+            AND start_date &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND end_date &lt;= #{endDate}
+        </if>
+        <if test="minPrice != null">
+            AND min_price &gt;= #{minPrice}
+        </if>
+        <if test="maxPrice != null">
+            AND min_price &lt;= #{maxPrice}
+        </if>
+    </select>
+    
+    <select id="findTopRanking" resultType="Performance">
+        SELECT p.*
+        FROM performance p
+        LEFT JOIN (
+            SELECT s.performance_id, COUNT(*) as res_count
+            FROM reservation_seat rs
+            JOIN seat s ON rs.seat_id = s.seat_id
+            JOIN reservation r ON rs.reservation_id = r.reservation_id
+            WHERE r.status = 'CONFIRMED'
+            GROUP BY s.performance_id
+        ) ranking ON p.performance_id = ranking.performance_id
+        WHERE p.approval_status = 'PUBLISHED'
+        ORDER BY ranking.res_count DESC, p.ticket_open_at DESC
+        LIMIT #{limit}
     </select>
     <select id="findById" resultType="Performance">SELECT * FROM performance WHERE performance_id = #{performanceId}</select>
     <select id="findByApiPerfId" resultType="Performance">SELECT * FROM performance WHERE api_perf_id = #{apiPerfId}</select>

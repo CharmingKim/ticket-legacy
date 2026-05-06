@@ -36,6 +36,12 @@
     <definition name="reservation/history" extends="layout-default">
         <put-attribute name="content" value="/WEB-INF/views/reservation/history.jsp" />
     </definition>
+    <definition name="reservation/detail" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/reservation/detail.jsp" />
+    </definition>
+    <definition name="reservation/ticket" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/reservation/ticket.jsp" />
+    </definition>
 
     <!-- 회원 -->
     <definition name="member/login" extends="layout-default">
@@ -46,6 +52,51 @@
     </definition>
     <definition name="member/mypage" extends="layout-default">
         <put-attribute name="content" value="/WEB-INF/views/member/mypage.jsp" />
+    </definition>
+    <definition name="member/wishlist" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/wishlist.jsp" />
+    </definition>
+    <definition name="member/my-reviews" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/my-reviews.jsp" />
+    </definition>
+    <definition name="member/waitlist" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/waitlist.jsp" />
+    </definition>
+    <definition name="member/change-password" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/change-password.jsp" />
+    </definition>
+    <definition name="member/edit-profile" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/edit-profile.jsp" />
+    </definition>
+    <definition name="member/withdraw" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/withdraw.jsp" />
+    </definition>
+    <definition name="member/coupons" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/coupons.jsp" />
+    </definition>
+
+    <!-- 공지사항 -->
+    <definition name="notice/list" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/notice/list.jsp" />
+    </definition>
+    <definition name="notice/detail" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/notice/detail.jsp" />
+    </definition>
+
+    <!-- 1:1 문의 -->
+    <definition name="inquiry/list" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/inquiry/list.jsp" />
+    </definition>
+    <definition name="inquiry/write" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/inquiry/write.jsp" />
+    </definition>
+    <definition name="inquiry/detail" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/inquiry/detail.jsp" />
+    </definition>
+
+    <!-- FAQ -->
+    <definition name="support/faq" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/support/faq.jsp" />
     </definition>
 
     <!-- 대기열 -->

@@ -107,6 +107,13 @@
             <!-- Test -->
             <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.10.3</version><scope>test</scope></dependency>
 
+            <!-- Elasticsearch -->
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-high-level-client</artifactId>
+                <version>7.17.22</version>
+            </dependency>
+
             <!-- ticket-common (하위 모듈 참조용) -->
             <dependency><groupId>com.ticketlegacy</groupId><artifactId>ticket-common</artifactId><version>${project.version}</version></dependency>
         </dependencies>

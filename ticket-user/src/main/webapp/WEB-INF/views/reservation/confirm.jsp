@@ -3,6 +3,9 @@
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
 <%@ taglib prefix="tl" uri="http://ticketlegacy.com/tl" %>
 
+<!-- PortOne (iamport) JS SDK -->
+<script src="https://cdn.iamport.kr/v1/iamport.js"></script>
+
 <div class="container py-5">
     <div class="tl-confirm-box">
 
@@ -124,14 +127,25 @@
 </div>
 
 <script>
-const ctx         = '${pageContext.request.contextPath}';
-const scheduleId  = '${scheduleId}';
-const seatIds     = '${seatIds}';
-let baseAmount    = ${totalAmount != null ? totalAmount : 0};
-let discountAmt   = 0;
-let selectedCouponId = null;
-
+const ctx        = '${pageContext.request.contextPath}';
+const scheduleId = '${scheduleId}';
+const seatIds    = '${seatIds}';
+let baseAmount   = ${totalAmount != null ? totalAmount : 0};
+const buyerEmail = '${not empty member.email ? member.email : ""}';
+const buyerName  = '${not empty member.name  ? member.name  : "고객"}';
+const buyerTel   = '${not empty member.phone  ? member.phone  : ""}';
+let discountAmt  = 0;
 let selectedCouponCode = null;
+
+// 재시도 지원: 한 번 생성된 PENDING 예약을 재사용
+// PortOne 취소 시 DB 예약만 유지 + Redis HOLD 보존 → 재시도 가능
+let activeReservationId = null;
+let activeReservationNo = null;
+
+function resetActiveReservation() {
+    activeReservationId = null;
+    activeReservationNo = null;
+}
 
 function calcDiscount(opt, base) {
     const type = opt.data('discount-type');
@@ -165,58 +179,106 @@ function restorePayBtn() {
 }
 
 $('#payBtn').on('click', function() {
-    const $btn = $(this);
     const seatIdList = seatIds.split(',').map(Number);
     const finalAmt   = Math.max(0, baseAmount - discountAmt);
     const method     = $('input[name="paymentMethod"]:checked').val();
 
     if (!method) { toast.warning('결제수단을 선택해주세요.'); return; }
+    $('#payBtn').prop('disabled', true).html('<span class="tl-spinner" style="width:20px;height:20px;border-width:2px"></span>');
 
-    $btn.prop('disabled', true).html('<span class="tl-spinner" style="width:20px;height:20px;border-width:2px"></span>');
-
-    // Step 1: 예약 생성 (PENDING)
-    api.post(ctx + '/api/reservation/create', {
-        scheduleId:  parseInt(scheduleId),
-        seatIds:     seatIdList,
-        totalAmount: baseAmount
-    })
-    .done(function(res) {
-        if (!res.success || !res.data || !res.data.reservationId) {
-            toast.error(res.message || '예약 생성에 실패했습니다.');
-            restorePayBtn();
-            return;
-        }
-        const reservationId = res.data.reservationId;
-
-        // Step 2: 결제 처리 (CONFIRMED)
-        // amount는 표시용일 뿐 — 서버가 reservation.totalAmount 기준으로 재계산
-        api.post(ctx + '/api/payment/process', {
-            reservationId: reservationId,
-            scheduleId:    parseInt(scheduleId),
-            seatIds:       seatIdList,
-            method:        method,
-            amount:        baseAmount,
-            couponCode:    selectedCouponCode
+    if (activeReservationId) {
+        // 이미 PENDING 예약 존재 — Redis HOLD 유효, 예약 생성 스킵하고 바로 PortOne 호출
+        openPortOne(activeReservationId, activeReservationNo, seatIdList, method, finalAmt);
+    } else {
+        // 최초 결제 시도 — 예약 생성 후 PortOne 호출
+        api.post(ctx + '/api/reservation/create', {
+            scheduleId:  parseInt(scheduleId),
+            seatIds:     seatIdList,
+            totalAmount: baseAmount
         })
-        .done(function(res2) {
-            if (res2.success) {
-                toast.success('결제가 완료되었습니다!');
-                setTimeout(() => { location.href = ctx + '/reservation/history'; }, 1500);
-            } else {
-                toast.error(res2.message || '결제에 실패했습니다.');
+        .done(function(res) {
+            if (!res.success || !res.data || !res.data.reservationId) {
+                toast.error(res.message || '예약 생성에 실패했습니다.');
                 restorePayBtn();
+                return;
             }
+            activeReservationId = res.data.reservationId;
+            activeReservationNo = res.data.reservationNo || ('R' + Date.now());
+            openPortOne(activeReservationId, activeReservationNo, seatIdList, method, finalAmt);
         })
         .fail(function(xhr) {
-            const msg = (xhr.responseJSON && xhr.responseJSON.message) || '결제 처리 중 오류가 발생했습니다.';
-            toast.error(msg);
+            toast.error((xhr.responseJSON && xhr.responseJSON.message) || '예약 생성 중 오류가 발생했습니다.');
             restorePayBtn();
         });
+    }
+});
+
+function openPortOne(reservationId, reservationNo, seatIdList, method, finalAmt) {
+    if (!window.IMP) {
+        toast.error('결제 모듈을 로드하지 못했습니다.');
+        restorePayBtn();
+        return;
+    }
+
+    IMP.init('imp43476356');
+
+    // 0원 결제 (전액 쿠폰) — PG 창 없이 바로 서버 처리
+    if (finalAmt <= 0) {
+        processPaymentToServer(reservationId, seatIdList, method, finalAmt, selectedCouponCode, 'free_pass');
+        return;
+    }
+
+    // merchant_uid: 재시도마다 고유값 필요 (PortOne 중복 방지)
+    const merchantUid = reservationNo + '-' + Date.now();
+    const payMethod   = method === 'CARD' ? 'card' : 'trans';
+
+    IMP.request_pay({
+        pg:           'html5_inicis.INIpayTest',
+        pay_method:   payMethod,
+        merchant_uid: merchantUid,
+        name:         $('#perfName').text().trim(),
+        amount:       finalAmt,
+        buyer_email:  buyerEmail,
+        buyer_name:   buyerName,
+        buyer_tel:    buyerTel
+    }, function(rsp) {
+        if (rsp.success) {
+            processPaymentToServer(reservationId, seatIdList, method, finalAmt, selectedCouponCode, rsp.imp_uid);
+        } else {
+            // PortOne 취소/실패 — DB 예약 및 Redis HOLD 그대로 유지하여 재시도 가능
+            toast.warning('결제가 취소되었습니다. 쿠폰이나 결제수단을 변경 후 다시 시도할 수 있습니다.');
+            restorePayBtn();
+        }
+    });
+}
+
+function processPaymentToServer(reservationId, seatIdList, method, finalAmt, couponCode, impUid) {
+    api.post(ctx + '/api/payment/process', {
+        reservationId: reservationId,
+        scheduleId:    parseInt(scheduleId),
+        seatIds:       seatIdList,
+        method:        method,
+        amount:        finalAmt,
+        couponCode:    couponCode,
+        impUid:        impUid
+    })
+    .done(function(res) {
+        if (res.success) {
+            resetActiveReservation();
+            toast.success('결제가 완료되었습니다!');
+            setTimeout(() => { location.href = ctx + '/reservation/history'; }, 1500);
+        } else {
+            // 서버 거절 — PaymentController가 orphan 취소 + Redis HOLD 삭제했으므로 초기화
+            resetActiveReservation();
+            toast.error(res.message || '결제 검증에 실패했습니다.');
+            restorePayBtn();
+        }
     })
     .fail(function(xhr) {
-        const msg = (xhr.responseJSON && xhr.responseJSON.message) || '예약 생성 중 오류가 발생했습니다.';
-        toast.error(msg);
+        // 서버 오류 — 동일하게 orphan 취소됨, 초기화
+        resetActiveReservation();
+        toast.error((xhr.responseJSON && xhr.responseJSON.message) || '결제 처리 중 오류가 발생했습니다.');
         restorePayBtn();
     });
-});
+}
 </script>

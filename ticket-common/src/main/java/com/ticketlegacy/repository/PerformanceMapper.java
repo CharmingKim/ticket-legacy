@@ -11,11 +11,20 @@ public interface PerformanceMapper {
     List<Performance> findAll(@Param("category") String category,
                               @Param("status") String status,
                               @Param("keyword") String keyword,
+                              @Param("startDate") String startDate,
+                              @Param("endDate") String endDate,
+                              @Param("minPrice") Integer minPrice,
+                              @Param("maxPrice") Integer maxPrice,
                               @Param("offset") int offset,
                               @Param("limit") int limit);
     int countAll(@Param("category") String category,
                  @Param("status") String status,
-                 @Param("keyword") String keyword);
+                 @Param("keyword") String keyword,
+                 @Param("startDate") String startDate,
+                 @Param("endDate") String endDate,
+                 @Param("minPrice") Integer minPrice,
+                 @Param("maxPrice") Integer maxPrice);
+    List<Performance> findTopRanking(@Param("limit") int limit);
     Performance findById(@Param("performanceId") Long performanceId);
     Performance findByApiPerfId(@Param("apiPerfId") String apiPerfId);
     int insert(Performance performance);

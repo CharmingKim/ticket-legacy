@@ -136,6 +136,14 @@ public class CouponService {
         log.info("쿠폰 사용: couponCode={}, reservationId={}", couponCode, reservationId);
     }
 
+    @Transactional
+    public void restoreCoupon(Long reservationId) {
+        int updated = couponMapper.restoreCoupon(reservationId);
+        if (updated > 0) {
+            log.info("예약 취소로 인한 쿠폰 복구 완료: reservationId={}", reservationId);
+        }
+    }
+
     // ─────────────────────────────────────────────
     // 스케줄러: 만료 쿠폰 일괄 처리
     // ─────────────────────────────────────────────

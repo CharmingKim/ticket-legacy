@@ -122,10 +122,74 @@ public class MemberService {
         return new LoginResult(token, member.getRole(), member.getName(), redirectUrl);
     }
 
+    @Transactional
+    public LoginResult socialLogin(String provider, String providerId, String email, String name) {
+        Member member = memberMapper.findByProvider(provider, providerId);
+        if (member == null) {
+            member = new Member();
+            member.setProvider(provider);
+            member.setProviderId(providerId);
+            member.setEmail(email != null ? email : provider + "_" + providerId + "@social.com");
+            member.setPassword(passwordEncoder.encode(providerId));
+            member.setName(name != null ? name : provider + "유저");
+            member.setPhone("");
+            member.setRole("USER");
+            memberMapper.insert(member);
+            log.info("소셜 회원가입 완료: provider={}, email={}", provider, member.getEmail());
+        }
+
+        if (!"ACTIVE".equals(member.getStatus())) {
+            throw new BusinessException(ErrorCode.AUTH_LOGIN_FAILED, "비활성 계정입니다.");
+        }
+        memberMapper.updateLastLogin(member.getMemberId());
+
+        String token = jwtUtil.generateToken(member.getMemberId(), member.getEmail(), member.getRole());
+        return new LoginResult(token, member.getRole(), member.getName(), "/");
+    }
+
     public Member findById(Long memberId) {
         Member m = memberMapper.findById(memberId);
         if (m == null) throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         return m;
+    }
+
+    // ──────────────────────────────────────────
+    // 회원 정보 수정 / 관리 (마이페이지)
+    // ──────────────────────────────────────────
+
+    @Transactional
+    public void changePassword(Long memberId, String currentPwd, String newPwd) {
+        Member member = memberMapper.findById(memberId);
+        if (member == null) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+        if (!passwordEncoder.matches(currentPwd, member.getPassword())) {
+            throw new BusinessException(ErrorCode.AUTH_LOGIN_FAILED, "현재 비밀번호가 일치하지 않습니다.");
+        }
+        memberMapper.updatePassword(memberId, passwordEncoder.encode(newPwd));
+        log.info("비밀번호 변경: memberId={}", memberId);
+    }
+
+    @Transactional
+    public void updateProfile(Long memberId, String name, String phone) {
+        if (memberMapper.updateProfile(memberId, name, phone) == 0) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+        log.info("회원정보 수정: memberId={}, name={}, phone={}", memberId, name, phone);
+    }
+
+    @Transactional
+    public void withdraw(Long memberId, String password, String reason) {
+        Member member = memberMapper.findById(memberId);
+        if (member == null) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+        }
+        if ("LOCAL".equals(member.getProvider()) && !passwordEncoder.matches(password, member.getPassword())) {
+            throw new BusinessException(ErrorCode.AUTH_LOGIN_FAILED, "비밀번호가 일치하지 않습니다.");
+        }
+        // 예약 내역 중 CONFIRMED 상태인 것이 있는지 확인 (나중에 ReservationService에서 체크할 수도 있지만 일단 여기서 상태 변경)
+        updateAdminStatus(memberId, MemberStatus.WITHDRAWN, memberId, reason);
+        log.info("회원 탈퇴: memberId={}, reason={}", memberId, reason);
     }
 
     // ──────────────────────────────────────────

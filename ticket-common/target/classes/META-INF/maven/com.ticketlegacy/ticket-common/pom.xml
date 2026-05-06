@@ -72,6 +72,9 @@
 
         <!-- Lombok -->
         <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId></dependency>
+        
+        <!-- Elasticsearch -->
+        <dependency><groupId>org.elasticsearch.client</groupId><artifactId>elasticsearch-rest-high-level-client</artifactId></dependency>
 
         <!-- Test -->
         <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId></dependency>

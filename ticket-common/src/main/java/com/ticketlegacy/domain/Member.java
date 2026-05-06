@@ -14,6 +14,8 @@ public class Member {
     private String phone;
     private String role;   // MemberRole: USER, STAFF, SUPER_ADMIN, PROMOTER, VENUE_MANAGER
     private String status; // MemberStatus: PENDING_APPROVAL, ACTIVE, SUSPENDED, DORMANT, WITHDRAWN
+    private String provider;
+    private String providerId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime lastLoginAt;

@@ -74,6 +74,12 @@
         WHERE coupon_code = #{couponCode} AND status = 'ISSUED' AND expires_at > NOW()
     </update>
 
+    <update id="restoreCoupon">
+        UPDATE coupon
+        SET status = 'ISSUED', used_at = NULL, reservation_id = NULL
+        WHERE reservation_id = #{reservationId} AND status = 'USED'
+    </update>
+
     <update id="expireOverdueCoupons">
         UPDATE coupon SET status = 'EXPIRED'
         WHERE status = 'ISSUED' AND expires_at &lt;= NOW()

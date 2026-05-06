@@ -23,6 +23,16 @@
             expression="org.springframework.stereotype.Controller" />
     </context:component-scan>
 
+    <!--
+        외부 설정 파일 (WEB-INF/spring/app.properties)
+        - PortOne 키: portone.imp-key, portone.imp-secret
+        - 키 파일이 없어도 기동 가능 (ignore-unresolvable=true)
+    -->
+    <context:property-placeholder
+        location="WEB-INF/spring/app.properties"
+        ignore-resource-not-found="true"
+        ignore-unresolvable="true" />
+
     <!-- DataSource (HikariCP) -->
     <bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
         <property name="driverClassName" value="com.mysql.cj.jdbc.Driver" />

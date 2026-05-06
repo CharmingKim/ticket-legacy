@@ -30,6 +30,7 @@
         <security:intercept-url pattern="/performance/list"      access="permitAll" />
         <security:intercept-url pattern="/performance/detail/**" access="permitAll" />
         <security:intercept-url pattern="/api/performances/**"   access="permitAll" />
+        <security:intercept-url pattern="/api/search/**"         access="permitAll" />
 
         <!-- 대기열 페이지 (비로그인도 접근 가능 — scheduleId만 필요) -->
         <security:intercept-url pattern="/queue/**"              access="permitAll" />

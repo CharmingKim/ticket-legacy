@@ -37,7 +37,20 @@
             </button>
         </form>
 
-        <div class="tl-auth-footer">
+        <div class="tl-auth-social mt-4 text-center">
+            <p class="text-muted small mb-3">또는 다음 계정으로 간편 로그인</p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="${pageContext.request.contextPath}/oauth/kakao/login" class="btn" style="background-color:#fee500; color:#000; border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; text-decoration:none;">
+                    <i class="bi bi-chat-fill"></i>
+                </a>
+                <!-- 네이버는 아직 API 미구현이나 샌드박스로 연결 -->
+                <a href="${pageContext.request.contextPath}/oauth/sandbox/callback?provider=naver" class="btn" style="background-color:#03c75a; color:#fff; border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; text-decoration:none;">
+                    <strong style="font-size:1.2rem;">N</strong>
+                </a>
+            </div>
+        </div>
+
+        <div class="tl-auth-footer mt-4">
             계정이 없으신가요?
             <a href="${pageContext.request.contextPath}/member/join">회원가입</a>
         </div>

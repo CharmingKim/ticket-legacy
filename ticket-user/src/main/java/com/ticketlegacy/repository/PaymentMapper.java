@@ -13,5 +13,7 @@ public interface PaymentMapper {
                         @Param("pgTransactionId") String pgTxId);
     int updateFailed(@Param("id") Long id,
                      @Param("failReason") String reason);
+    Payment findByReservationId(@Param("reservationId") Long reservationId);
+    int updateRefunded(@Param("id") Long id, @Param("reason") String reason);
     List<Payment> findStalePending(@Param("minutes") int minutes);
 }

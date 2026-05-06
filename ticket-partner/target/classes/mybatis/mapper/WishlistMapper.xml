@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.WishlistMapper">
+
+    <insert id="insert">
+        INSERT INTO performance_wishlist (member_id, performance_id)
+        VALUES (#{memberId}, #{performanceId})
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM performance_wishlist
+        WHERE member_id = #{memberId} AND performance_id = #{performanceId}
+    </delete>
+
+    <select id="checkWish" resultType="int">
+        SELECT COUNT(*) FROM performance_wishlist
+        WHERE member_id = #{memberId} AND performance_id = #{performanceId}
+    </select>
+
+    <select id="findByMemberId" resultType="com.ticketlegacy.domain.Wishlist">
+        SELECT w.*, 
+               p.title AS performanceTitle, 
+               p.poster_url AS posterUrl, 
+               p.venue_name AS venueName, 
+               p.start_date AS startDate, 
+               p.end_date AS endDate
+        FROM performance_wishlist w
+        JOIN performance p ON w.performance_id = p.performance_id
+        WHERE w.member_id = #{memberId}
+        ORDER BY w.created_at DESC
+    </select>
+
+    <select id="countByPerformanceId" resultType="int">
+        SELECT COUNT(*) FROM performance_wishlist
+        WHERE performance_id = #{performanceId}
+    </select>
+
+</mapper>

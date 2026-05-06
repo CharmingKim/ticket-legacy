@@ -14,17 +14,17 @@ import java.util.List;
 public class PerformanceService {
     @Autowired private PerformanceMapper performanceMapper;
 
-    public List<Performance> findAll(String category, String status, String keyword, int page, int size) {
-        return performanceMapper.findAll(category, status, keyword, (page - 1) * size, size);
+    public List<Performance> findAll(String category, String status, String keyword, String startDate, String endDate, Integer minPrice, Integer maxPrice, int page, int size) {
+        return performanceMapper.findAll(category, status, keyword, startDate, endDate, minPrice, maxPrice, (page - 1) * size, size);
     }
     public List<Performance> findAll(String category, String status, int page, int size) {
-        return findAll(category, status, null, page, size);
+        return findAll(category, status, null, null, null, null, null, page, size);
     }
-    public int countAll(String category, String status, String keyword) {
-        return performanceMapper.countAll(category, status, keyword);
+    public int countAll(String category, String status, String keyword, String startDate, String endDate, Integer minPrice, Integer maxPrice) {
+        return performanceMapper.countAll(category, status, keyword, startDate, endDate, minPrice, maxPrice);
     }
     public int countAll(String category, String status) {
-        return countAll(category, status, null);
+        return countAll(category, status, null, null, null, null, null);
     }
     public Performance findById(Long id) {
         Performance p = performanceMapper.findById(id);
@@ -33,5 +33,8 @@ public class PerformanceService {
     }
     public List<Schedule> findSchedules(Long performanceId) {
         return performanceMapper.findSchedules(performanceId);
+    }
+    public List<Performance> getTopRanking(int limit) {
+        return performanceMapper.findTopRanking(limit);
     }
 }

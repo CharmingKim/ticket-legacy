@@ -4,11 +4,14 @@
     <select id="findByEmail" resultType="Member">SELECT * FROM member WHERE email = #{email}</select>
     <select id="findById" resultType="Member">SELECT * FROM member WHERE member_id = #{memberId}</select>
     <select id="existsByEmail" resultType="int">SELECT COUNT(*) FROM member WHERE email = #{email}</select>
+    <select id="findByProvider" resultType="Member">SELECT * FROM member WHERE provider = #{provider} AND provider_id = #{providerId}</select>
     <insert id="insert" parameterType="Member" useGeneratedKeys="true" keyProperty="memberId">
-        INSERT INTO member (email, password, name, phone, role, status)
+        INSERT INTO member (email, password, name, phone, role, status, provider, provider_id)
         VALUES (#{email}, #{password}, #{name}, #{phone},
                 COALESCE(#{role}, 'USER'),
-                COALESCE(#{status}, 'ACTIVE'))
+                COALESCE(#{status}, 'ACTIVE'),
+                COALESCE(#{provider}, 'LOCAL'),
+                #{providerId})
     </insert>
     <update id="updateLastLogin">UPDATE member SET last_login_at = NOW() WHERE member_id = #{memberId}</update>
     <update id="updateStatus">
@@ -17,6 +20,12 @@
             updated_at = NOW()
             <if test="'WITHDRAWN'.equals(status)">, withdrawn_at = NOW()</if>
         WHERE member_id = #{memberId}
+    </update>
+    <update id="updatePassword">
+        UPDATE member SET password = #{password}, updated_at = NOW() WHERE member_id = #{memberId}
+    </update>
+    <update id="updateProfile">
+        UPDATE member SET name = #{name}, phone = #{phone}, updated_at = NOW() WHERE member_id = #{memberId}
     </update>
     <select id="countAll" resultType="int">
         SELECT COUNT(*)

@@ -27,6 +27,7 @@ public class AdminPerformanceService {
     private final VenueStageSectionMapper venueStageSectionMapper;
     private final PerformanceSeatGradeMapper performanceSeatGradeMapper;
     private final PerformanceSectionOverrideMapper performanceSectionOverrideMapper;
+    private final PerformanceSearchService searchService;
 
     // ─────────────────────────────────────────────────
     // 회차(Schedule) 관리
@@ -214,6 +215,9 @@ public class AdminPerformanceService {
         perf.setTotalSeats(seats.size());
         performanceMapper.update(perf);
         log.info("공연 좌석 생성 완료: performanceId={}, 총{}석", performanceId, seats.size());
+
+        // Elasticsearch 자동 동기화 (총 좌석 수 반영)
+        searchService.indexPerformance(perf);
         return seats.size();
     }
 

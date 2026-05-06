@@ -33,6 +33,9 @@ public class Performance {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // 검색 결과 하이라이팅 표시용 (ES 검색 결과)
+    private String displayTitle;
+
     // 조인 조회용 (기획사명)
     private String promoterCompanyName;
 
