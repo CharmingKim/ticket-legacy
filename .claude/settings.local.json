@@ -63,7 +63,17 @@
       "PowerShell(cmd /c \"dir D:\\\\ /b 2>&1\")",
       "PowerShell(cmd /c \"dir D:\\\\spring-legacy\\\\ /b 2>&1\")",
       "PowerShell(cmd /c \"dir D:\\\\spring-legacy\\\\ticket-parent\\\\ /b 2>&1\")",
-      "PowerShell(winget install *)"
+      "PowerShell(winget install *)",
+      "WebSearch",
+      "Bash(scp *)",
+      "Bash(python3 *)",
+      "Bash(Get-Content \"D:\\\\springGreen\\\\springframework\\\\works\\\\ticket-parent\\\\발표대본.md\" -Encoding UTF8)",
+      "Bash(Measure-Object -Line)",
+      "Bash(sed 's/.*FROM //')",
+      "Bash(sed 's/.*INTO //')",
+      "Bash(sed 's/.*UPDATE //')",
+      "Bash(Get-ChildItem -Path \"D:\\\\springGreen\\\\springframework\\\\works\\\\ticket-parent\" -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }

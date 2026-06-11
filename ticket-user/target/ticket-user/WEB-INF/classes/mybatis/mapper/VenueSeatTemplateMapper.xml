@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.VenueSeatTemplateMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO venue_seat_template (venue_id, section_id, seat_row, seat_number, seat_type)
+        VALUES
+        <foreach collection="templates" item="t" separator=",">
+            (#{t.venueId}, #{t.sectionId}, #{t.seatRow}, #{t.seatNumber}, #{t.seatType})
+        </foreach>
+    </insert>
+
+    <select id="findByVenueId" resultType="VenueSeatTemplate">
+        SELECT vst.*, vs.section_name
+        FROM venue_seat_template vst
+        JOIN venue_section vs ON vst.section_id = vs.section_id
+        WHERE vst.venue_id = #{venueId}
+        ORDER BY vs.display_order, vst.seat_row, vst.seat_number
+    </select>
+
+    <select id="countByVenueId" resultType="int">
+        SELECT COUNT(*) FROM venue_seat_template WHERE venue_id = #{venueId}
+    </select>
+
+    <delete id="deleteByVenueId">
+        DELETE FROM venue_seat_template WHERE venue_id = #{venueId}
+    </delete>
+
+    <delete id="deleteBySectionId">
+        DELETE FROM venue_seat_template WHERE section_id = #{sectionId}
+    </delete>
+
+</mapper>

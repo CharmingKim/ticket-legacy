@@ -34,12 +34,15 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
+        String envKey = System.getenv("JWT_SECRET_KEY");
+        if (envKey != null && !envKey.isBlank()) {
+            secretKeyBase64 = envKey;
+        }
         if (secretKeyBase64 != null && !secretKeyBase64.isBlank()) {
             byte[] keyBytes = Base64.getDecoder().decode(secretKeyBase64);
             this.secretKey = Keys.hmacShaKeyFor(keyBytes);
-            log.info("JwtUtil: 환경변수/properties 에서 JWT secret key 로드 완료");
+            log.info("JwtUtil: JWT secret key 로드 완료");
         } else {
-            // 로컬 개발 fallback — 서버 재시작 시마다 키가 변경되므로 단일 서버에서만 허용
             this.secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
             log.warn("JwtUtil: JWT_SECRET_KEY 미설정 — 랜덤 키 사용 (단일 서버 로컬 전용)");
         }

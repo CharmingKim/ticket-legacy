@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    command: redis-server --maxmemory 50mb --maxmemory-policy allkeys-lru
+
+  ticket-user:
+    image: ticket-user:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=jdbc:mysql://${RDS_HOST}:3306/springgreen6?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JAVA_OPTS=-Xms128m -Xmx220m
+    depends_on:
+      - redis
+    restart: unless-stopped
+    mem_limit: 280m
+
+  ticket-partner:
+    image: ticket-partner:latest
+    ports:
+      - "8081:8080"
+    environment:
+      - DB_URL=jdbc:mysql://${RDS_HOST}:3306/springgreen6?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JAVA_OPTS=-Xms128m -Xmx200m
+    restart: unless-stopped
+    mem_limit: 260m
+
+  ticket-admin:
+    image: ticket-admin:latest
+    ports:
+      - "8082:8080"
+    environment:
+      - DB_URL=jdbc:mysql://${RDS_HOST}:3306/springgreen6?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JAVA_OPTS=-Xms128m -Xmx200m
+    restart: unless-stopped
+    mem_limit: 260m

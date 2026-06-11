@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xsi:schemaLocation="
+           http://www.springframework.org/schema/beans   http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+           http://www.springframework.org/schema/mvc     http://www.springframework.org/schema/mvc/spring-mvc.xsd">
+
+    <context:component-scan base-package="com.ticketlegacy.web" />
+
+    <mvc:annotation-driven>
+        <mvc:argument-resolvers>
+            <ref bean="authMemberArgumentResolver" />
+        </mvc:argument-resolvers>
+        <mvc:message-converters register-defaults="true">
+            <bean class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+                <property name="objectMapper" ref="objectMapper"/>
+            </bean>
+        </mvc:message-converters>
+    </mvc:annotation-driven>
+
+    <mvc:view-controller path="/" view-name="redirect:/partner/login" />
+
+    <mvc:resources mapping="/css/**"       location="/resources/css/"    cache-period="86400" />
+    <mvc:resources mapping="/js/**"        location="/resources/js/"     cache-period="86400" />
+    <mvc:resources mapping="/images/**"    location="/resources/images/" cache-period="86400" />
+    <mvc:resources mapping="/resources/**" location="/resources/"        cache-period="86400" />
+
+    <bean id="tilesConfigurer" class="org.springframework.web.servlet.view.tiles3.TilesConfigurer">
+        <property name="definitions">
+            <list><value>/WEB-INF/tiles/tiles-config.xml</value></list>
+        </property>
+    </bean>
+    <bean id="tilesViewResolver" class="org.springframework.web.servlet.view.tiles3.TilesViewResolver">
+        <property name="order" value="1" />
+    </bean>
+
+    <bean id="jspViewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <property name="prefix" value="/WEB-INF/views/" />
+        <property name="suffix" value=".jsp" />
+        <property name="order" value="2" />
+    </bean>
+
+    <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+        <property name="maxUploadSize" value="10485760" />
+        <property name="defaultEncoding" value="UTF-8" />
+    </bean>
+
+    <mvc:interceptors>
+        <mvc:interceptor>
+            <mvc:mapping path="/**" />
+            <mvc:exclude-mapping path="/css/**" />
+            <mvc:exclude-mapping path="/js/**" />
+            <mvc:exclude-mapping path="/images/**" />
+            <mvc:exclude-mapping path="/resources/**" />
+            <bean class="com.ticketlegacy.web.interceptor.AuthInterceptor" />
+        </mvc:interceptor>
+    </mvc:interceptors>
+
+    <bean id="messageSource" class="org.springframework.context.support.ReloadableResourceBundleMessageSource">
+        <property name="basename" value="classpath:messages/messages" />
+        <property name="defaultEncoding" value="UTF-8" />
+    </bean>
+
+    <bean id="authMemberArgumentResolver"
+          class="com.ticketlegacy.web.support.AuthMemberArgumentResolver" />
+</beans>

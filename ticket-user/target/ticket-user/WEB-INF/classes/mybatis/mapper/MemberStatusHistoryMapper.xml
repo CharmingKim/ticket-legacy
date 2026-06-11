@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.MemberStatusHistoryMapper">
+
+    <insert id="insert" parameterType="MemberStatusHistory">
+        INSERT INTO member_status_history (member_id, from_status, to_status, changed_by, reason)
+        VALUES (#{memberId}, #{fromStatus}, #{toStatus}, #{changedBy}, #{reason})
+    </insert>
+
+    <select id="findByMemberId" resultType="MemberStatusHistory">
+        SELECT * FROM member_status_history
+        WHERE member_id = #{memberId}
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>

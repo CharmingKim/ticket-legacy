@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.VenueStageSectionMapper">
+
+    <resultMap id="stageSectionMap" type="VenueStageSection">
+        <id property="id" column="id"/>
+        <result property="configId" column="config_id"/>
+        <result property="sectionId" column="section_id"/>
+        <result property="active" column="is_active"/>
+        <result property="customRows" column="custom_rows"/>
+        <result property="customSeatsPerRow" column="custom_seats_per_row"/>
+        <result property="sectionName" column="section_name"/>
+        <result property="sectionType" column="section_type"/>
+        <result property="defaultRows" column="total_rows"/>
+        <result property="defaultSeatsPerRow" column="seats_per_row"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="VenueStageSection">
+        INSERT INTO venue_stage_section (config_id, section_id, is_active, custom_rows, custom_seats_per_row)
+        VALUES (#{configId}, #{sectionId}, #{active}, #{customRows}, #{customSeatsPerRow})
+    </insert>
+
+    <!-- 존재하면 UPDATE, 없으면 INSERT -->
+    <insert id="upsert" parameterType="VenueStageSection">
+        INSERT INTO venue_stage_section (config_id, section_id, is_active, custom_rows, custom_seats_per_row)
+        VALUES (#{configId}, #{sectionId}, #{active}, #{customRows}, #{customSeatsPerRow})
+        ON DUPLICATE KEY UPDATE
+            is_active = VALUES(is_active),
+            custom_rows = VALUES(custom_rows),
+            custom_seats_per_row = VALUES(custom_seats_per_row)
+    </insert>
+
+    <select id="findByConfigId" resultMap="stageSectionMap">
+        SELECT vss.*, vs.section_name, vs.section_type, vs.total_rows, vs.seats_per_row
+        FROM venue_stage_section vss
+        JOIN venue_section vs ON vss.section_id = vs.section_id
+        WHERE vss.config_id = #{configId}
+        ORDER BY vs.display_order
+    </select>
+
+    <delete id="deleteByConfigId">
+        DELETE FROM venue_stage_section WHERE config_id = #{configId}
+    </delete>
+
+    <delete id="deleteBySectionId">
+        DELETE FROM venue_stage_section WHERE section_id = #{sectionId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC
+        "-//Apache Software Foundation//DTD Tiles Configuration 3.0//EN"
+        "http://tiles.apache.org/dtds/tiles-config_3_0.dtd">
+<tiles-definitions>
+
+    <definition name="layout-default" template="/WEB-INF/views/layout/default-layout.jsp">
+        <put-attribute name="header"  value="/WEB-INF/views/layout/header.jsp" />
+        <put-attribute name="content" value="" />
+        <put-attribute name="footer"  value="/WEB-INF/views/layout/footer.jsp" />
+    </definition>
+
+    <definition name="layout-partner" template="/WEB-INF/views/layout/partner-layout.jsp">
+        <put-attribute name="sidebar" value="/WEB-INF/views/layout/partner-sidebar.jsp" />
+        <put-attribute name="content" value="" />
+    </definition>
+
+    <!-- 기획사 포털 -->
+    <definition name="partner/promoter/dashboard" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/promoter/dashboard.jsp" />
+    </definition>
+    <definition name="partner/promoter/performance-list" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/promoter/performance-list.jsp" />
+    </definition>
+    <definition name="partner/promoter/performance-form" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/promoter/performance-form.jsp" />
+    </definition>
+    <definition name="partner/promoter/sales-report" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/promoter/sales-report.jsp" />
+    </definition>
+    <definition name="partner/promoter/settlement" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/promoter/settlement.jsp" />
+    </definition>
+    <definition name="partner/promoter/notices" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/promoter/notices.jsp" />
+    </definition>
+
+    <!-- 공연장 담당자 포털 -->
+    <definition name="partner/venue/dashboard" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/venue/dashboard.jsp" />
+    </definition>
+    <definition name="partner/venue/venue-info" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/venue/venue-info.jsp" />
+    </definition>
+    <definition name="partner/venue/schedule-calendar" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/venue/schedule-calendar.jsp" />
+    </definition>
+    <definition name="partner/venue/entrance" extends="layout-partner">
+        <put-attribute name="content" value="/WEB-INF/views/partner/venue/entrance.jsp" />
+    </definition>
+
+    <!-- 로그인 -->
+    <definition name="member/login" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/login.jsp" />
+    </definition>
+
+    <!-- 에러 -->
+    <definition name="error/500" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/500.jsp" />
+    </definition>
+    <definition name="error/503" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/503.jsp" />
+    </definition>
+    <definition name="error/404" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/404.jsp" />
+    </definition>
+
+</tiles-definitions>

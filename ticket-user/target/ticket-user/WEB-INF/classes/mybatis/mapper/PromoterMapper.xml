@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.PromoterMapper">
+
+    <resultMap id="promoterMap" type="com.ticketlegacy.domain.Promoter">
+        <id     property="promoterId"     column="promoter_id" />
+        <result property="memberId"       column="member_id" />
+        <result property="companyName"    column="company_name" />
+        <result property="businessRegNo"  column="business_reg_no" />
+        <result property="representative" column="representative" />
+        <result property="contactEmail"   column="contact_email" />
+        <result property="contactPhone"   column="contact_phone" />
+        <result property="contractDocUrl" column="contract_doc_url" />
+        <result property="approvalStatus" column="approval_status" />
+        <result property="approvedBy"     column="approved_by" />
+        <result property="approvedAt"     column="approved_at" />
+        <result property="rejectReason"   column="reject_reason" />
+        <result property="createdAt"      column="created_at" />
+        <result property="updatedAt"      column="updated_at" />
+        <result property="memberEmail"    column="member_email" />
+        <result property="memberName"     column="member_name" />
+        <result property="memberPhone"    column="member_phone" />
+    </resultMap>
+
+    <select id="findById" resultMap="promoterMap">
+        SELECT p.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone
+        FROM promoter p
+        JOIN member m ON p.member_id = m.member_id
+        WHERE p.promoter_id = #{promoterId}
+    </select>
+
+    <select id="findByMemberId" resultMap="promoterMap">
+        SELECT p.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone
+        FROM promoter p
+        JOIN member m ON p.member_id = m.member_id
+        WHERE p.member_id = #{memberId}
+    </select>
+
+    <select id="findByStatus" resultMap="promoterMap">
+        SELECT p.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone
+        FROM promoter p
+        JOIN member m ON p.member_id = m.member_id
+        WHERE p.approval_status = #{status}
+        ORDER BY p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM promoter
+        WHERE approval_status = #{status}
+    </select>
+
+    <select id="findAll" resultMap="promoterMap">
+        SELECT p.*,
+               m.email AS member_email,
+               m.name  AS member_name,
+               m.phone AS member_phone
+        FROM promoter p
+        JOIN member m ON p.member_id = m.member_id
+        ORDER BY p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM promoter
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="promoterId">
+        INSERT INTO promoter (
+            member_id, company_name, business_reg_no, representative,
+            contact_email, contact_phone, contract_doc_url, approval_status
+        ) VALUES (
+            #{memberId}, #{companyName}, #{businessRegNo}, #{representative},
+            #{contactEmail}, #{contactPhone}, #{contractDocUrl}, #{approvalStatus}
+        )
+    </insert>
+
+    <update id="updateApproval">
+        UPDATE promoter
+        SET approval_status = #{approvalStatus},
+            approved_by     = #{approvedBy},
+            reject_reason   = #{rejectReason},
+            approved_at     = NOW(),
+            updated_at      = NOW()
+        WHERE promoter_id = #{promoterId}
+    </update>
+
+</mapper>

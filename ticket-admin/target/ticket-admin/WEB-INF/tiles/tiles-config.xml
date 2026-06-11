@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC
+        "-//Apache Software Foundation//DTD Tiles Configuration 3.0//EN"
+        "http://tiles.apache.org/dtds/tiles-config_3_0.dtd">
+<tiles-definitions>
+
+    <!-- 기본 레이아웃 (로그인 페이지용) -->
+    <definition name="layout-default" template="/WEB-INF/views/layout/default-layout.jsp">
+        <put-attribute name="header"  value="/WEB-INF/views/layout/header.jsp" />
+        <put-attribute name="content" value="" />
+        <put-attribute name="footer"  value="/WEB-INF/views/layout/footer.jsp" />
+    </definition>
+
+    <!-- 백오피스 레이아웃 -->
+    <definition name="layout-backoffice" template="/WEB-INF/views/layout/backoffice-layout.jsp">
+        <put-attribute name="sidebar" value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content" value="" />
+    </definition>
+
+    <!-- 백오피스 — SUPER_ADMIN -->
+    <definition name="backoffice/super/dashboard" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/super/dashboard.jsp" />
+    </definition>
+    <definition name="backoffice/super/member-list" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/super/member-list.jsp" />
+    </definition>
+    <definition name="backoffice/super/statistics" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/super/statistics.jsp" />
+    </definition>
+    <definition name="backoffice/super/settlement" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/super/settlement.jsp" />
+    </definition>
+    <definition name="backoffice/super/coupons" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/super/coupons.jsp" />
+    </definition>
+    <definition name="backoffice/super/notices" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/super/notices.jsp" />
+    </definition>
+
+    <!-- 백오피스 — STAFF -->
+    <definition name="backoffice/staff/dashboard" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/staff/dashboard.jsp" />
+    </definition>
+    <definition name="backoffice/staff/reservation-search" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/staff/reservation-search.jsp" />
+    </definition>
+    <definition name="backoffice/staff/member-search" extends="layout-backoffice">
+        <put-attribute name="sidebar"  value="/WEB-INF/views/layout/backoffice-sidebar.jsp" />
+        <put-attribute name="content"  value="/WEB-INF/views/backoffice/staff/member-search.jsp" />
+    </definition>
+
+    <!-- 로그인 페이지 -->
+    <definition name="member/login" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/member/login.jsp" />
+    </definition>
+
+    <!-- 에러 페이지 -->
+    <definition name="error/500" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/500.jsp" />
+    </definition>
+    <definition name="error/503" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/503.jsp" />
+    </definition>
+    <definition name="error/404" extends="layout-default">
+        <put-attribute name="content" value="/WEB-INF/views/error/404.jsp" />
+    </definition>
+
+</tiles-definitions>

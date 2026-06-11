@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketlegacy.repository.EntranceLogMapper">
+    <resultMap id="entranceLogMap" type="EntranceLog">
+        <id property="entranceLogId" column="entrance_log_id"/>
+        <result property="reservationId" column="reservation_id"/>
+        <result property="scheduleId" column="schedule_id"/>
+        <result property="venueId" column="venue_id"/>
+        <result property="memberId" column="member_id"/>
+        <result property="checkedInBy" column="checked_in_by"/>
+        <result property="note" column="note"/>
+        <result property="checkedInAt" column="checked_in_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="reservationNo" column="reservation_no"/>
+        <result property="performanceTitle" column="performance_title"/>
+        <result property="memberName" column="member_name"/>
+        <result property="memberPhone" column="member_phone"/>
+        <result property="showDate" column="show_date"/>
+        <result property="showTime" column="show_time"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="EntranceLog" useGeneratedKeys="true" keyProperty="entranceLogId">
+        INSERT INTO entrance_log (
+            reservation_id, schedule_id, venue_id, member_id, checked_in_by, note, checked_in_at
+        ) VALUES (
+            #{reservationId}, #{scheduleId}, #{venueId}, #{memberId}, #{checkedInBy}, #{note}, NOW()
+        )
+    </insert>
+
+    <select id="findByReservationId" resultMap="entranceLogMap">
+        SELECT el.*, r.reservation_no, p.title AS performance_title,
+               m.name AS member_name, m.phone AS member_phone,
+               sc.show_date, sc.show_time
+        FROM entrance_log el
+        JOIN reservation r ON el.reservation_id = r.reservation_id
+        JOIN schedule sc ON el.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        JOIN member m ON el.member_id = m.member_id
+        WHERE el.reservation_id = #{reservationId}
+    </select>
+
+    <select id="countByVenueIdAndDate" resultType="int">
+        SELECT COUNT(*)
+        FROM entrance_log
+        WHERE venue_id = #{venueId}
+          AND DATE(checked_in_at) = #{targetDate}
+    </select>
+
+    <select id="findByScheduleId" resultMap="entranceLogMap">
+        SELECT el.*, r.reservation_no, p.title AS performance_title,
+               m.name AS member_name, m.phone AS member_phone,
+               sc.show_date, sc.show_time
+        FROM entrance_log el
+        JOIN reservation r ON el.reservation_id = r.reservation_id
+        JOIN schedule sc ON el.schedule_id = sc.schedule_id
+        JOIN performance p ON sc.performance_id = p.performance_id
+        JOIN member m ON el.member_id = m.member_id
+        WHERE el.schedule_id = #{scheduleId}
+        ORDER BY el.checked_in_at DESC
+    </select>
+</mapper>

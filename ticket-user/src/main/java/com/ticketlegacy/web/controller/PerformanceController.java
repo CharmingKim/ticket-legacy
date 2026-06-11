@@ -60,19 +60,24 @@ public class PerformanceController {
         int total;
 
         if (searchKeyword != null && !searchKeyword.isEmpty()) {
-            // Elasticsearch 검색 수행 (정렬 파라미터 추가)
+            // Elasticsearch 검색 수행 — ES 미연결 시 DB 검색으로 자동 fallback
             List<java.util.Map<String, Object>> esResults = searchService.search(searchKeyword, page, size, sort);
-            // ES 결과에서 ID 추출하여 DB에서 상세 정보 조회 (순서 유지)
-            list = new java.util.ArrayList<>();
-            for (java.util.Map<String, Object> hit : esResults) {
-                Long id = Long.valueOf(hit.get("performanceId").toString());
-                Performance p = performanceService.findById(id);
-                if (p != null) {
-                    p.setDisplayTitle(hit.containsKey("displayTitle") ? (String) hit.get("displayTitle") : p.getTitle());
-                    list.add(p);
+            if (!esResults.isEmpty()) {
+                list = new java.util.ArrayList<>();
+                for (java.util.Map<String, Object> hit : esResults) {
+                    Long id = Long.valueOf(hit.get("performanceId").toString());
+                    Performance p = performanceService.findById(id);
+                    if (p != null) {
+                        p.setDisplayTitle(hit.containsKey("displayTitle") ? (String) hit.get("displayTitle") : p.getTitle());
+                        list.add(p);
+                    }
                 }
+                total = list.size();
+            } else {
+                // ES 미연결 또는 결과 없음 → DB 검색
+                list = performanceService.findAll(genre, status, searchKeyword, startDate, endDate, minPrice, maxPrice, page, size);
+                total = performanceService.countAll(genre, status, searchKeyword, startDate, endDate, minPrice, maxPrice);
             }
-            total = list.size(); // 검색 결과 총합은 ES 검색 결과 기반 (간이 구현)
         } else {
             // 일반 DB 목록 조회
             list = performanceService.findAll(genre, status, searchKeyword, startDate, endDate, minPrice, maxPrice, page, size);
